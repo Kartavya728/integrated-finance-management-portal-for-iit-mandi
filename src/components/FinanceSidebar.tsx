@@ -29,8 +29,8 @@ export function FinanceSidebar() {
       ),
     },
     {
-      label: "Bills & Applications",
-      href: "#",
+      label: "Apply for Bill",
+      href: "/apply-bill",
       icon: (
         <IconReceipt2 className="h-5 w-5 shrink-0 text-neutral-700" />
       ),
@@ -90,7 +90,6 @@ export function FinanceSidebar() {
         </SidebarBody>
       </Sidebar>
 
-      {/* Main Dashboard */}
       <FinanceDashboard />
     </div>
   );
@@ -133,18 +132,16 @@ export const LogoIcon = () => {
   );
 };
 
-// Finance Dashboard (Main Content)
 const FinanceDashboard = () => {
   return (
     <div className="flex flex-1">
       <div className="flex h-full w-full flex-1 flex-col gap-6 rounded-tl-2xl border border-gray-300 bg-white p-6">
-        {/* Balance Card */}
+
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-800">PDA Balance</h2>
           <p className="mt-2 text-2xl font-bold text-green-600">₹ 1,20,000</p>
         </div>
 
-        {/* Bills Section */}
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-800">
             Recent Bill Applications
