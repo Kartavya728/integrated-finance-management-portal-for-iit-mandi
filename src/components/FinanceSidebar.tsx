@@ -11,6 +11,7 @@ import {
 } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
+import { signOut } from "next-auth/react";
 
 export function FinanceSidebar() {
   const links = [
@@ -42,13 +43,6 @@ export function FinanceSidebar() {
         <IconSettings className="h-5 w-5 shrink-0 text-neutral-700" />
       ),
     },
-    {
-      label: "Logout",
-      href: "#",
-      icon: (
-        <IconArrowLeft className="h-5 w-5 shrink-0 text-neutral-700" />
-      ),
-    },
   ];
 
   const [open, setOpen] = useState(false);
@@ -68,6 +62,14 @@ export function FinanceSidebar() {
               {links.map((link, idx) => (
                 <SidebarLink key={idx} link={link} />
               ))}
+              {/* Logout button */}
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-left w-full mt-2"
+              >
+                <IconArrowLeft className="h-5 w-5 shrink-0 text-neutral-700" />
+                <span>Logout</span>
+              </button>
             </div>
           </div>
           <div>
@@ -136,12 +138,10 @@ const FinanceDashboard = () => {
   return (
     <div className="flex flex-1">
       <div className="flex h-full w-full flex-1 flex-col gap-6 rounded-tl-2xl border border-gray-300 bg-white p-6">
-
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-800">PDA Balance</h2>
           <p className="mt-2 text-2xl font-bold text-green-600">₹ 1,20,000</p>
         </div>
-
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-800">
             Recent Bill Applications
@@ -152,10 +152,7 @@ const FinanceDashboard = () => {
             <li>Travel Reimbursement – Under Review</li>
           </ul>
         </div>
-
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 shadow-sm">
-
-        </div>
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 shadow-sm"></div>
       </div>
     </div>
   );
