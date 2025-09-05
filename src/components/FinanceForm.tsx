@@ -1,158 +1,263 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
-export default function FinanceForm() {
+export default function BillForm({ employee, bill }: { employee?: any; bill?: any }) {
   const supabase = createClientComponentClient();
-  const [formData, setFormData] = useState<any>({});
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    po_details: bill?.po_details || "",
+    po_value: bill?.po_value || "",
+    supplier_name: bill?.supplier_name || "",
+    supplier_address: bill?.supplier_address || "",
+    item_category: bill?.item_category || "",
+    item_description: bill?.item_description || "",
+    qty: bill?.qty || 1,
+    bill_details: bill?.bill_details || "",
+    indenter_name: bill?.indenter_name || employee?.full_name || "",
+    qty_issued: bill?.qty_issued || 1,
+    source_of_fund: bill?.source_of_fund || "",
+    stock_entry: bill?.stock_entry || "",
+    location: bill?.location || "",
+    remarks: bill?.remarks || "",
+  });
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value, type } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "number" ? parseFloat(value) : value,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from("finance_items").insert([formData]);
-    if (error) {
-      console.error("Insert Error:", error.message);
-      alert("Error saving data");
-    } else {
-      alert("Data saved successfully!");
-      setFormData({});
+    setIsSubmitting(true);
+
+    try {
+      let res;
+      if (bill) {
+        res = await supabase.from("bills").update(formData).eq("id", bill.id);
+      } else {
+        res = await supabase.from("bills").insert([
+          {
+            ...formData,
+            employee_id: employee?.id || null,
+            status: "User",
+          },
+        ]);
+      }
+
+      if (res.error) {
+        console.error("Error saving bill:", res.error.message);
+        alert("Failed to save bill");
+      } else {
+        alert("Bill saved successfully!");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 p-6 max-w-3xl mx-auto bg-white rounded-xl shadow-md"
+      className="space-y-6 p-6 bg-white rounded-lg shadow-md max-w-4xl mx-auto"
     >
-      <input
-        type="number"
-        placeholder="Sr. No"
-        name="sr_no"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        placeholder="PO Details"
-        name="po_details"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        type="date"
-        placeholder="PO Date"
-        name="po_date"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        type="number"
-        placeholder="Purchase Order Value Rs."
-        name="purchase_order_value"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        placeholder="Supplier Name"
-        name="supplier_name"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        placeholder="Supplier Address"
-        name="supplier_address"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        placeholder="Item Category"
-        name="item_category"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <textarea
-        placeholder="Item Description"
-        name="item_description"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        type="number"
-        placeholder="Qty"
-        name="qty"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        placeholder="Bill No."
-        name="bill_no"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        type="date"
-        placeholder="Bill Date"
-        name="bill_date"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        type="number"
-        placeholder="Bill Value"
-        name="bill_value"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        placeholder="Indenter Name"
-        name="indenter_name"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        type="number"
-        placeholder="Qty Issued"
-        name="qty_issued"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        placeholder="Source of Fund"
-        name="source_of_fund"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        placeholder="Stock Entry (Register/Page/S.No)"
-        name="stock_entry"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <input
-        placeholder="Location"
-        name="location"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
-      <textarea
-        placeholder="Remarks"
-        name="remarks"
-        onChange={handleChange}
-        className="w-full border rounded-lg p-2"
-      />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* PO Details */}
+        <div>
+          <label className="block text-sm font-medium mb-1">PO Details (No. & Date)</label>
+          <input
+            name="po_details"
+            value={formData.po_details}
+            onChange={handleChange}
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
 
-      <button
-        type="submit"
-        className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-      >
-        Save
-      </button>
+        {/* PO Value */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Purchase Order Value (Rs.)</label>
+          <input
+            type="number"
+            name="po_value"
+            value={formData.po_value}
+            onChange={handleChange}
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        {/* Source of Fund */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Source of Fund</label>
+          <input
+            name="source_of_fund"
+            value={formData.source_of_fund}
+            onChange={handleChange}
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        {/* Supplier Name */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Supplier Name</label>
+          <input
+            name="supplier_name"
+            value={formData.supplier_name}
+            onChange={handleChange}
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        {/* Supplier Address */}
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium mb-1">Supplier Address</label>
+          <input
+            name="supplier_address"
+            value={formData.supplier_address}
+            onChange={handleChange}
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        {/* Item Category */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Item Category</label>
+          <select
+            name="item_category"
+            value={formData.item_category}
+            onChange={handleChange}
+            required
+            className="w-full border rounded p-2"
+          >
+            <option value="">Select category</option>
+            <option value="Major">Major</option>
+            <option value="Minor">Minor</option>
+            <option value="Consumable">Consumable</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        {/* Item Description */}
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium mb-1">
+            Item Description with Specification
+          </label>
+          <textarea
+            name="item_description"
+            value={formData.item_description}
+            onChange={handleChange}
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        {/* Qty */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Quantity</label>
+          <input
+            type="number"
+            name="qty"
+            min="1"
+            value={formData.qty}
+            onChange={handleChange}
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        {/* Qty Issued */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Quantity Issued</label>
+          <input
+            type="number"
+            name="qty_issued"
+            min="1"
+            value={formData.qty_issued}
+            onChange={handleChange}
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        {/* Bill Details */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Bill Details (No., Date, Value)</label>
+          <input
+            name="bill_details"
+            value={formData.bill_details}
+            onChange={handleChange}
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        {/* Indenter */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Indenter / Issued To</label>
+          <input
+            name="indenter_name"
+            value={formData.indenter_name}
+            onChange={handleChange}
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        {/* Stock Entry */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Stock Entry (No., Page, S.No.)</label>
+          <input
+            name="stock_entry"
+            value={formData.stock_entry}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        {/* Location */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Location</label>
+          <input
+            name="location"
+            value={formData.location}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          />
+        </div>
+      </div>
+
+      {/* Remarks */}
+      <div>
+        <label className="block text-sm font-medium mb-1">Remarks</label>
+        <textarea
+          name="remarks"
+          value={formData.remarks}
+          onChange={handleChange}
+          className="w-full border rounded p-2"
+        />
+      </div>
+
+      {/* Submit */}
+      <div className="flex justify-end pt-4">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-48 bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+        >
+          {isSubmitting ? "Saving..." : bill ? "Update Bill" : "Submit Bill"}
+        </button>
+      </div>
     </form>
   );
 }

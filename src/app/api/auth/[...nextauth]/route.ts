@@ -1,22 +1,22 @@
-import NextAuth, { SessionStrategy, type AuthOptions } from "next-auth";
+import NextAuth, { type AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import ldap from "ldapjs";
 
-// Ensure this route runs on the Node.js runtime (ldapjs requires Node APIs)
 export const runtime = "nodejs";
 
 const ldapConfig = {
   url: "ldap://users.iitmandi.ac.in:389",
   baseDN: "dc=iitmandi,dc=ac,dc=in",
-  ou: ["students_ug","Faculty", "Staff"],
+  ou: ["students_ug", "Faculty", "Staff"],
 };
 
-type LdapUser = { uid: string; cn: string; mail: string; ou: string };
-
-async function authenticateWithLDAP(username: string, password: string): Promise<LdapUser | null> {
-  // Try OUs sequentially; add timeouts so we don't hang forever
+// ---------------- LDAP Authentication ----------------
+async function authenticateWithLDAP(
+  username: string,
+  password: string
+): Promise<null | { uid: string; cn: string; mail: string; ou: string }> {
   for (const ou of ldapConfig.ou) {
-    const attempt = await new Promise<LdapUser | null>((resolve) => {
+    const attempt = await new Promise<any>((resolve) => {
       const client = ldap.createClient({
         url: ldapConfig.url,
         timeout: 5000,
@@ -26,23 +26,29 @@ async function authenticateWithLDAP(username: string, password: string): Promise
       const dn = `uid=${username},ou=${ou},${ldapConfig.baseDN}`;
 
       let settled = false;
-
-      const done = (result: LdapUser | null) => {
+      const done = (result: any) => {
         if (settled) return;
         settled = true;
         try {
           client.unbind();
-        } catch {}
+        } catch {
+          /* ignore */
+        }
         resolve(result);
       };
 
-      // Safety timeout in case the server doesn't respond
-      const safetyTimer = setTimeout(() => done(null), 6000);
+      // Fail-safe timeout
+      const timer = setTimeout(() => done(null), 6000);
 
-      client.bind(dn, password, (err: Error | null) => {
-        clearTimeout(safetyTimer);
+      client.bind(dn, password, (err) => {
+        clearTimeout(timer);
         if (err) return done(null);
-        return done({ uid: username, cn: username, mail: `${username}@iitmandi.ac.in`, ou });
+        return done({
+          uid: username,
+          cn: username,
+          mail: `${username}@iitmandi.ac.in`,
+          ou,
+        });
       });
 
       client.on("error", () => done(null));
@@ -53,6 +59,7 @@ async function authenticateWithLDAP(username: string, password: string): Promise
   return null;
 }
 
+// ---------------- NextAuth Configuration ----------------
 export const authOptions: AuthOptions = {
   providers: [
     CredentialsProvider({
@@ -63,32 +70,50 @@ export const authOptions: AuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials) return null;
-        const user = await authenticateWithLDAP(credentials.username, credentials.password);
-        if (!user) return null;
-        return { id: user.uid, name: user.cn, email: user.mail, ou: user.ou };
+
+        const user = await authenticateWithLDAP(
+          credentials.username,
+          credentials.password
+        );
+
+        if (!user) {
+          throw new Error("Invalid credentials");
+        }
+
+        // Return normalized user object for NextAuth
+        return {
+          id: user.uid,
+          username: user.uid,
+          name: user.cn,
+          email: user.mail,
+          ou: user.ou,
+        };
       },
     }),
   ],
   session: {
-    strategy: "jwt" as SessionStrategy,
+    strategy: "jwt",
   },
   jwt: {
     maxAge: 60 * 60 * 8, // 8 hours
   },
   callbacks: {
-    async jwt({ token, user }: { token: any; user?: any }) {
+    async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.ou = user.ou;
+        token.id = (user as any).id;
+        token.username = (user as any).username;
+        token.ou = (user as any).ou;
       }
       return token;
     },
-    async session({ session, token }: { session: any; token: any }) {
-      session.user.id = token.id;
-      session.user.ou = token.ou;
-      console.log(session)
+    async session({ session, token }) {
+      session.user = {
+        ...session.user,
+        id: token.id as string,
+        username: token.username as string,
+        ou: token.ou as string,
+      };
       return session;
-      
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
