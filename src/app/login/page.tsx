@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
+import { getEmployeeTypeByUserId } from "../api/supabase";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -21,7 +22,20 @@ export default function LoginPage() {
     if (res?.error) {
       setError("Login failed");
     } else if (res?.ok) {
-      window.location.href = "/";
+      const session = await getSession();
+      const userId = session?.user?.id;
+      
+
+      if(userId){
+       
+      const employeeType=await getEmployeeTypeByUserId(userId);
+      console.log(employeeType) 
+      window.location.href = `/${employeeType}`;
+      }
+      else{
+        setError("can't find type of employee");
+      }
+
     }
     setLoading(false);
   };

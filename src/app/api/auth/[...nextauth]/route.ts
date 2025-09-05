@@ -86,7 +86,9 @@ export const authOptions: AuthOptions = {
     async session({ session, token }: { session: any; token: any }) {
       session.user.id = token.id;
       session.user.ou = token.ou;
+      console.log(session)
       return session;
+      
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
