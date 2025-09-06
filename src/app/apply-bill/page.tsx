@@ -1,15 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export default function BillForm({ bill }: { bill?: any }) {
   const { data: session } = useSession();
   const supabase = createClientComponentClient();
+  const router = useRouter();
 
-  const username = session?.user?.username; // 🔑 must exist in your NextAuth session
+  const username = session?.user?.username; // must exist in your NextAuth session
 
+  const [balance, setBalance] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -27,6 +30,25 @@ export default function BillForm({ bill }: { bill?: any }) {
     stock_entry: bill?.stock_entry || "",
     location: bill?.location || "",
   });
+
+  // ✅ Fetch PDA balance
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!username) return;
+
+      const { data: balanceData, error } = await supabase
+        .from("pda_balances")
+        .select("balance")
+        .eq("employee_id", username)
+        .single();
+
+      if (!error && balanceData) {
+        setBalance(balanceData.balance);
+      }
+    };
+
+    fetchBalance();
+  }, [username, supabase]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -46,9 +68,35 @@ export default function BillForm({ bill }: { bill?: any }) {
       return;
     }
 
+    const poValue = parseFloat(formData.po_value || "0");
+
+    // ✅ Check PDA balance
+    if (poValue > balance) {
+      alert("Insufficient PDA balance to submit this bill.");
+      return;
+    }
+
+    // ✅ Check category if > 50k
+    if (poValue > 50000 && formData.item_category === "Minor") {
+      alert("Bills above 50k cannot have category 'Minor'.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      // Decide bill stage
+      let snp: string | null = null;
+      let audit: string | null = null;
+
+      if (poValue > 50000) {
+        snp = "Pending";
+        audit = null;
+      } else {
+        snp = null;
+        audit = "Pending";
+      }
+
       let res;
       if (bill) {
         res = await supabase.from("bills").update(formData).eq("id", bill.id);
@@ -56,8 +104,10 @@ export default function BillForm({ bill }: { bill?: any }) {
         res = await supabase.from("bills").insert([
           {
             ...formData,
-            employee_id: username, // 🔑 direct username saved
+            employee_id: username,
             status: "Student Purchase",
+            snp,
+            audit,
           },
         ]);
       }
@@ -66,7 +116,14 @@ export default function BillForm({ bill }: { bill?: any }) {
         console.error("Error saving bill:", res.error.message);
         alert("Failed to save bill.");
       } else {
+        // ✅ Subtract from balance
+        await supabase
+          .from("pda_balances")
+          .update({ balance: balance - poValue })
+          .eq("employee_id", username);
+
         alert("Bill saved successfully!");
+        router.push("/user"); // redirect
       }
     } catch (err) {
       console.error("Unexpected error:", err);
@@ -81,6 +138,25 @@ export default function BillForm({ bill }: { bill?: any }) {
       onSubmit={handleSubmit}
       className="space-y-6 p-6 bg-white rounded-lg shadow-md max-w-4xl mx-auto"
     >
+      {/* Website Title */}
+      <h1 className="text-2xl font-bold text-center mb-4">
+        IIT Mandi Finance Portal
+      </h1>
+
+      {/* Show PDA Balance */}
+      <div className="flex justify-between items-center mb-6">
+        <button
+          type="button"
+          className="px-4 py-2 bg-gray-200 rounded"
+          onClick={() => alert(`PDA Balance: ₹ ${balance.toLocaleString()}`)}
+        >
+          Show PDA Balance
+        </button>
+        <span className="text-lg font-semibold">
+          Balance: ₹ {balance.toLocaleString()}
+        </span>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* PO Details */}
         <div>
@@ -227,7 +303,9 @@ export default function BillForm({ bill }: { bill?: any }) {
 
         {/* Indenter */}
         <div>
-          <label className="block text-sm font-medium mb-1">Indenter / Issued To</label>
+          <label className="block text-sm font-medium mb-1">
+            Indenter / Issued To
+          </label>
           <input
             name="indenter_name"
             value={formData.indenter_name}

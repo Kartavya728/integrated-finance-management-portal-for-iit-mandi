@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../utils/supabase/client";
 import { signOut, useSession } from "next-auth/react";
 import {
@@ -10,8 +10,8 @@ import {
   IconX,
   IconClockPause,
   IconHome,
-  IconEye,
   IconListDetails,
+  IconCode,
 } from "@tabler/icons-react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,8 @@ interface Bill {
   employee_id: string;
   item_description?: string;
   qty?: number;
+  remarks1?: string; // audit remark
+  remarks2?: string; // snp remark
 }
 
 export default function AuditDashboard() {
@@ -37,8 +39,12 @@ export default function AuditDashboard() {
   const [open, setOpen] = useState(false);
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
-  const [activeFilter, setActiveFilter] = useState<"All" | "Approved" | "Hold" | "Reject">("All");
+  const [expandedBill, setExpandedBill] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<
+    "All" | "Approved" | "Hold" | "Reject" | "Pending"
+  >("All");
+  const [remarks, setRemarks] = useState<{ [key: string]: string }>({});
+  const [jsonView, setJsonView] = useState<string | null>(null);
 
   // fetch bills
   useEffect(() => {
@@ -51,7 +57,11 @@ export default function AuditDashboard() {
           .order("created_at", { ascending: false });
 
         if (error) throw error;
-        setBills(data || []);
+        // exclude student purchase
+        const filtered = (data || []).filter(
+          (b: Bill) => b.status !== "Student Purchase"
+        );
+        setBills(filtered);
       } catch (err) {
         console.error("Error fetching bills:", err);
       } finally {
@@ -90,16 +100,22 @@ export default function AuditDashboard() {
 
   // Hold
   const handleHold = async (bill: Bill) => {
+    if (!remarks[bill.id] || remarks[bill.id].trim() === "") {
+      alert("Please provide a remark before holding.");
+      return;
+    }
     try {
       const { error } = await supabase
         .from("bills")
-        .update({ audit: "Hold" })
+        .update({ audit: "Hold", remarks1: remarks[bill.id] })
         .eq("id", bill.id);
 
       if (error) throw error;
 
       setBills((prev) =>
-        prev.map((b) => (b.id === bill.id ? { ...b, audit: "Hold" } : b))
+        prev.map((b) =>
+          b.id === bill.id ? { ...b, audit: "Hold", remarks1: remarks[bill.id] } : b
+        )
       );
     } catch (err) {
       console.error("Error putting bill on hold:", err);
@@ -108,16 +124,22 @@ export default function AuditDashboard() {
 
   // Reject
   const handleReject = async (bill: Bill) => {
+    if (!remarks[bill.id] || remarks[bill.id].trim() === "") {
+      alert("Please provide a remark before rejecting.");
+      return;
+    }
     try {
       const { error } = await supabase
         .from("bills")
-        .update({ audit: "Reject" })
+        .update({ audit: "Reject", remarks1: remarks[bill.id] })
         .eq("id", bill.id);
 
       if (error) throw error;
 
       setBills((prev) =>
-        prev.map((b) => (b.id === bill.id ? { ...b, audit: "Reject" } : b))
+        prev.map((b) =>
+          b.id === bill.id ? { ...b, audit: "Reject", remarks1: remarks[bill.id] } : b
+        )
       );
     } catch (err) {
       console.error("Error rejecting bill:", err);
@@ -128,6 +150,8 @@ export default function AuditDashboard() {
   const filteredBills =
     activeFilter === "All"
       ? bills
+      : activeFilter === "Pending"
+      ? bills.filter((b) => b.audit === "Pending")
       : bills.filter((b) => b.audit === activeFilter);
 
   const links = [
@@ -135,6 +159,11 @@ export default function AuditDashboard() {
       label: "All Bills",
       icon: <IconListDetails className="h-5 w-5 shrink-0 text-blue-600" />,
       onClick: () => setActiveFilter("All"),
+    },
+    {
+      label: "Pending Bills",
+      icon: <IconClockPause className="h-5 w-5 shrink-0 text-gray-600" />,
+      onClick: () => setActiveFilter("Pending"),
     },
     {
       label: "Approved Bills",
@@ -159,12 +188,7 @@ export default function AuditDashboard() {
   ];
 
   return (
-    <div
-      className={cn(
-        "mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-hidden rounded-md border border-gray-200 bg-white md:flex-row",
-        "h-screen shadow-lg"
-      )}
-    >
+    <div className="flex w-full h-screen overflow-hidden bg-white md:flex-row">
       {/* Sidebar */}
       <Sidebar open={open} setOpen={setOpen}>
         <SidebarBody className="justify-between gap-8">
@@ -184,7 +208,7 @@ export default function AuditDashboard() {
                     )}
                   >
                     {link.icon}
-                    <span>{link.label}</span>
+                    {open && <span>{link.label}</span>}
                   </button>
                 )
               )}
@@ -193,7 +217,7 @@ export default function AuditDashboard() {
                 className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-left w-full mt-4"
               >
                 <IconArrowLeft className="h-5 w-5 shrink-0 text-neutral-700" />
-                <span>Logout</span>
+                {open && <span>Logout</span>}
               </button>
             </div>
           </div>
@@ -201,8 +225,8 @@ export default function AuditDashboard() {
       </Sidebar>
 
       {/* Main Content */}
-      <div className="flex flex-1">
-        <div className="flex h-full w-full flex-1 flex-col gap-6 rounded-tl-2xl bg-gray-50 p-8 overflow-y-auto">
+      <div className="flex flex-1 bg-gray-50 overflow-y-auto">
+        <div className="flex w-full flex-col gap-6 p-4">
           {loading ? (
             <p className="text-gray-500">Loading Audit bills...</p>
           ) : (
@@ -216,142 +240,226 @@ export default function AuditDashboard() {
                 Audit Department – {activeFilter} Bills
               </motion.h1>
 
-              {/* Bills Table */}
               {filteredBills.length === 0 ? (
                 <p className="text-gray-500">No bills found.</p>
               ) : (
-                <motion.table
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.2, duration: 0.4 }}
-                  className="min-w-full divide-y divide-gray-200 rounded-lg border bg-white shadow-sm"
-                >
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                        PO Details
-                      </th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                        Supplier
-                      </th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                        Value
-                      </th>
-                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                        Audit
-                      </th>
-                      <th className="px-6 py-3 text-sm font-semibold text-gray-700 text-right">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredBills.map((bill) => (
-                      <tr key={bill.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-3 text-sm text-gray-800">
-                          {bill.po_details}
-                        </td>
-                        <td className="px-6 py-3 text-sm text-gray-700">
-                          {bill.supplier_name}
-                        </td>
-                        <td className="px-6 py-3 text-sm font-medium text-gray-900">
-                          ₹ {bill.po_value.toLocaleString()}
-                        </td>
-                        <td
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredBills.map((bill) => {
+                    const isExpanded = expandedBill === bill.id;
+                    const locked = bill.audit === "Approved" || bill.audit === "Reject";
+
+                    return (
+                      <div
+                        key={bill.id}
+                        className={cn(
+                          "rounded-lg p-4 shadow cursor-pointer",
+                          bill.audit === "Approved"
+                            ? "border-4 border-green-500"
+                            : bill.audit === "Reject"
+                            ? "border-4 border-red-500"
+                            : bill.audit === "Hold"
+                            ? "border-4 border-yellow-500"
+                            : "border border-gray-300"
+                        )}
+                        onClick={() =>
+                          setExpandedBill(isExpanded ? null : bill.id)
+                        }
+                      >
+                        <h2
                           className={cn(
-                            "px-6 py-3 text-sm font-medium",
+                            "text-lg font-semibold",
                             bill.audit === "Approved"
                               ? "text-green-600"
                               : bill.audit === "Reject"
                               ? "text-red-600"
                               : bill.audit === "Hold"
                               ? "text-yellow-600"
-                              : "text-gray-500"
+                              : "text-gray-700"
                           )}
                         >
-                          {bill.audit}
-                        </td>
-                        <td className="px-6 py-3 text-sm text-right flex gap-2 justify-end">
-                          <button
-                            onClick={() => setSelectedBill(bill)}
-                            className="flex items-center gap-1 px-3 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                          >
-                            <IconEye size={16} /> View
-                          </button>
-                          {bill.audit !== "Approved" && (
-                            <>
-                              <button
-                                onClick={() => handleApprove(bill)}
-                                className="flex items-center gap-1 px-3 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200"
-                              >
-                                <IconCheck size={16} /> Approve
-                              </button>
-                              <button
-                                onClick={() => handleHold(bill)}
-                                className="flex items-center gap-1 px-3 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
-                              >
-                                <IconClockPause size={16} /> Hold
-                              </button>
-                              <button
-                                onClick={() => handleReject(bill)}
-                                className="flex items-center gap-1 px-3 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200"
-                              >
-                                <IconX size={16} /> Reject
-                              </button>
-                            </>
+                          {bill.po_details} – {bill.supplier_name}
+                        </h2>
+                        <p className="text-gray-600">Value: ₹ {bill.po_value}</p>
+                        <p className="text-sm font-medium">
+                          Status: {bill.audit} at Audit
+                        </p>
+
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.3 }}
+                              className="mt-3 space-y-2"
+                            >
+                              <p className="text-gray-700">
+                                Item: {bill.item_description}
+                              </p>
+                              <p className="text-gray-700">Qty: {bill.qty}</p>
+
+                              {/* Remarks */}
+                              {bill.remarks1 && (
+                                <p className="font-bold text-gray-700">
+                                  Audit Remark: {bill.remarks1}
+                                </p>
+                              )}
+                              {bill.remarks2 && (
+                                <p className="font-bold text-gray-700">
+                                  SnP Remark: {bill.remarks2}
+                                </p>
+                              )}
+
+                              {/* Remark Input */}
+                              {!locked && (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Enter remark..."
+                                    value={remarks[bill.id] || ""}
+                                    onChange={(e) =>
+                                      setRemarks((prev) => ({
+                                        ...prev,
+                                        [bill.id]: e.target.value,
+                                      }))
+                                    }
+                                    className="flex-1 px-2 py-1 border rounded"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setJsonView(JSON.stringify(bill, null, 2));
+                                    }}
+                                    className="p-2 rounded bg-gray-200 hover:bg-gray-300"
+                                  >
+                                    <IconCode className="h-5 w-5 text-gray-700" />
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Action buttons */}
+                              {!locked && (
+                                <div className="flex gap-3 mt-3">
+                                  {bill.audit === "Pending" && (
+                                    <>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleApprove(bill);
+                                        }}
+                                        className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
+                                      >
+                                        Approve
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleHold(bill);
+                                        }}
+                                        className="px-3 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600"
+                                      >
+                                        Hold
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleReject(bill);
+                                        }}
+                                        className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700"
+                                      >
+                                        Reject
+                                      </button>
+                                    </>
+                                  )}
+                                  {bill.audit === "Hold" && (
+                                    <>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleApprove(bill);
+                                        }}
+                                        className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
+                                      >
+                                        Approve
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleReject(bill);
+                                        }}
+                                        className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700"
+                                      >
+                                        Reject
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </motion.div>
                           )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </motion.table>
-              )}
-
-              {/* Modal for details */}
-              {selectedBill && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
-                  <div className="bg-white rounded-lg shadow-lg p-6 w-[500px] relative">
-                    <h2 className="text-lg font-semibold mb-4">
-                      Bill Details – {selectedBill.po_details}
-                    </h2>
-                    <p><b>Supplier:</b> {selectedBill.supplier_name}</p>
-                    <p><b>Value:</b> ₹ {selectedBill.po_value}</p>
-                    <p><b>Description:</b> {selectedBill.item_description}</p>
-                    <p><b>Quantity:</b> {selectedBill.qty}</p>
-                    <p><b>Status:</b> {selectedBill.status}</p>
-                    <p><b>Audit:</b> {selectedBill.audit}</p>
-
-                    <div className="mt-6 flex justify-end gap-3">
-                      <button
-                        onClick={() => setSelectedBill(null)}
-                        className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </>
           )}
         </div>
       </div>
+
+      {/* JSON Modal */}
+      <AnimatePresence>
+        {jsonView && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            onClick={() => setJsonView(null)}
+          >
+            <div
+              className="bg-white p-6 rounded-lg max-w-2xl w-full h-96 overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <pre className="text-sm text-gray-800">{jsonView}</pre>
+              <button
+                onClick={() => setJsonView(null)}
+                className="mt-3 px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 /* ------------------------- Sidebar Logos ------------------------- */
 export const Logo = () => (
-  <a href="#" className="relative z-20 flex items-center space-x-2 py-1 text-base font-semibold text-black">
+  <a
+    href="#"
+    className="relative z-20 flex items-center space-x-2 py-1 text-base font-semibold text-black"
+  >
     <img src="/iit.png" alt="IIT Mandi" className="h-8 w-8" />
-    <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="whitespace-pre text-black">
+    <motion.span
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="whitespace-pre text-black"
+    >
       IIT Mandi Finance
     </motion.span>
   </a>
 );
 
 export const LogoIcon = () => (
-  <a href="#" className="relative z-20 flex items-center py-1 text-sm font-semibold text-black">
+  <a
+    href="#"
+    className="relative z-20 flex items-center py-1 text-sm font-semibold text-black"
+  >
     <img src="/iit.png" alt="IIT Mandi" className="h-8 w-8" />
   </a>
 );

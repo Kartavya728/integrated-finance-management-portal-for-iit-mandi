@@ -6,12 +6,11 @@ import { supabase } from "../utils/supabase/client";
 import { signOut, useSession } from "next-auth/react";
 import {
   IconArrowLeft,
-  IconCheck,
-  IconX,
-  IconClockPause,
   IconUsers,
   IconList,
   IconHome,
+  IconClockPause,
+  IconFileText,
 } from "@tabler/icons-react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -37,7 +36,7 @@ interface Employee {
   department: string;
 }
 
-type PageView = "dashboard" | "hold-bills" | "employees";
+type PageView = "dashboard" | "review-bills" | "hold-bills" | "employees";
 
 export default function FinanceAdminDashboard() {
   const { data: session } = useSession();
@@ -48,6 +47,8 @@ export default function FinanceAdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   const [activePage, setActivePage] = useState<PageView>("dashboard");
+
+  const [editingEmployee, setEditingEmployee] = useState<string | null>(null);
 
   // fetch bills
   useEffect(() => {
@@ -101,6 +102,7 @@ export default function FinanceAdminDashboard() {
   };
 
   const handleHold = async (bill: Bill, remark: string) => {
+    if (!remark.trim()) return alert("Please provide a remark before holding.");
     await supabase
       .from("bills")
       .update({ finance_admin: "Hold", remarks: remark })
@@ -112,14 +114,17 @@ export default function FinanceAdminDashboard() {
     );
   };
 
-  const handleReject = async (bill: Bill) => {
+  const handleReject = async (bill: Bill, remark: string) => {
+    if (!remark.trim()) return alert("Please provide a remark before rejecting.");
     await supabase
       .from("bills")
-      .update({ finance_admin: "Reject" })
+      .update({ finance_admin: "Reject", remarks: remark })
       .eq("id", bill.id);
     setBills((prev) =>
       prev.map((b) =>
-        b.id === bill.id ? { ...b, finance_admin: "Reject" } : b
+        b.id === bill.id
+          ? { ...b, finance_admin: "Reject", remarks: remark }
+          : b
       )
     );
   };
@@ -135,6 +140,7 @@ export default function FinanceAdminDashboard() {
     setEmployees((prev) =>
       prev.map((e) => (e.id === id ? { ...e, department: dept } : e))
     );
+    setEditingEmployee(null);
   };
 
   const handleAddEmployee = async () => {
@@ -165,6 +171,11 @@ export default function FinanceAdminDashboard() {
       onClick: () => setActivePage("dashboard"),
     },
     {
+      label: "Review Bills",
+      icon: <IconFileText className="h-5 w-5 shrink-0 text-indigo-600" />,
+      onClick: () => setActivePage("review-bills"),
+    },
+    {
       label: "Hold Bills",
       icon: <IconClockPause className="h-5 w-5 shrink-0 text-yellow-600" />,
       onClick: () => setActivePage("hold-bills"),
@@ -183,12 +194,7 @@ export default function FinanceAdminDashboard() {
 
   /* ---------- Render Pages ---------- */
   return (
-    <div
-      className={cn(
-        "mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-hidden rounded-md border border-gray-200 bg-white md:flex-row",
-        "h-screen shadow-lg"
-      )}
-    >
+    <div className="flex h-screen w-full bg-white overflow-hidden">
       {/* Sidebar */}
       <Sidebar open={open} setOpen={setOpen}>
         <SidebarBody className="justify-between gap-8">
@@ -209,7 +215,7 @@ export default function FinanceAdminDashboard() {
                     )}
                   >
                     {link.icon}
-                    <span>{link.label}</span>
+                    {open && <span>{link.label}</span>}
                   </button>
                 )
               )}
@@ -218,7 +224,7 @@ export default function FinanceAdminDashboard() {
                 className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-left w-full mt-4"
               >
                 <IconArrowLeft className="h-5 w-5 shrink-0 text-neutral-700" />
-                <span>Logout</span>
+                {open && <span>Logout</span>}
               </button>
             </div>
           </div>
@@ -226,7 +232,7 @@ export default function FinanceAdminDashboard() {
       </Sidebar>
 
       {/* Main Content */}
-      <div className="flex flex-1 p-6 overflow-y-auto bg-gray-50">
+      <div className="flex flex-1 p-4 overflow-y-auto bg-gray-50">
         {activePage === "dashboard" && (
           <div className="w-full">
             <h1 className="text-2xl font-semibold mb-6">Finance Admin Dashboard</h1>
@@ -254,61 +260,40 @@ export default function FinanceAdminDashboard() {
                 <p className="text-2xl font-bold text-blue-700">{pendingCount}</p>
               </motion.div>
             </div>
+          </div>
+        )}
 
-            {/* Pending Bills Table */}
-            <h2 className="text-xl font-semibold mb-4">Pending Bills</h2>
-            {bills.filter((b) => b.finance_admin === "Pending").length === 0 ? (
-              <p className="text-gray-500">No pending bills</p>
-            ) : (
-              <table className="min-w-full divide-y divide-gray-200 border rounded bg-white shadow-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold">PO Details</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold">Supplier</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold">Value</th>
-                    <th className="px-6 py-3 text-sm font-semibold text-right">Actions</th>
+        {/* Review Bills Page */}
+        {activePage === "review-bills" && (
+          <div className="w-full">
+            <h2 className="text-2xl font-semibold mb-6">Review All Bills</h2>
+            <table className="min-w-full divide-y divide-gray-200 border rounded bg-white shadow-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-6 py-3">PO Details</th>
+                  <th className="px-6 py-3">Supplier</th>
+                  <th className="px-6 py-3">Value</th>
+                  <th className="px-6 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bills.map((bill) => (
+                  <tr key={bill.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-3">{bill.po_details}</td>
+                    <td className="px-6 py-3">{bill.supplier_name}</td>
+                    <td className="px-6 py-3">₹ {bill.po_value}</td>
+                    <td className="px-6 py-3">{bill.finance_admin}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {bills
-                    .filter((b) => b.finance_admin === "Pending")
-                    .map((bill) => (
-                      <tr key={bill.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-3">{bill.po_details}</td>
-                        <td className="px-6 py-3">{bill.supplier_name}</td>
-                        <td className="px-6 py-3">₹ {bill.po_value}</td>
-                        <td className="px-6 py-3 text-right space-x-2">
-                          <button
-                            onClick={() => handleApprove(bill)}
-                            className="px-3 py-1 rounded bg-green-100 text-green-700"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleHold(bill, "Finance check")}
-                            className="px-3 py-1 rounded bg-yellow-100 text-yellow-700"
-                          >
-                            Hold
-                          </button>
-                          <button
-                            onClick={() => handleReject(bill)}
-                            className="px-3 py-1 rounded bg-red-100 text-red-700"
-                          >
-                            Reject
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            )}
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
         {/* Hold Bills Page */}
         {activePage === "hold-bills" && (
           <div className="w-full">
-            <h2 className="text-2xl font-semibold mb-6">All Hold Bills</h2>
+            <h2 className="text-2xl font-semibold mb-6">All Hold Bills (Any Dept)</h2>
             {bills.filter((b) => b.snp === "Hold" || b.audit === "Hold" || b.finance_admin === "Hold").length === 0 ? (
               <p className="text-gray-500">No hold bills</p>
             ) : (
@@ -327,14 +312,7 @@ export default function FinanceAdminDashboard() {
                       <tr key={bill.id}>
                         <td className="px-6 py-3">{bill.po_details}</td>
                         <td className="px-6 py-3">{bill.status}</td>
-                        <td className="px-6 py-3">
-                          <input
-                            type="text"
-                            defaultValue={bill.remarks || ""}
-                            onBlur={(e) => handleHold(bill, e.target.value)}
-                            className="border p-1 rounded w-full"
-                          />
-                        </td>
+                        <td className="px-6 py-3">{bill.remarks || "-"}</td>
                       </tr>
                     ))}
                 </tbody>
@@ -372,6 +350,7 @@ export default function FinanceAdminDashboard() {
                     <td className="px-6 py-3">
                       <select
                         value={emp.department}
+                        disabled={editingEmployee !== emp.id ? true : false}
                         onChange={(e) => handleUpdateDepartment(emp.id, e.target.value)}
                         className="border p-1 rounded"
                       >
@@ -382,12 +361,31 @@ export default function FinanceAdminDashboard() {
                       </select>
                     </td>
                     <td className="px-6 py-3 text-right">
-                      <button
-                        onClick={() => handleDeleteEmployee(emp.id)}
-                        className="px-3 py-1 rounded bg-red-100 text-red-700"
-                      >
-                        Delete
-                      </button>
+                      {editingEmployee === emp.id ? (
+                        <button
+                          onClick={() =>
+                            handleUpdateDepartment(emp.id, emp.department)
+                          }
+                          className="px-3 py-1 rounded bg-green-100 text-green-700"
+                        >
+                          Save
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setEditingEmployee(emp.id)}
+                            className="px-3 py-1 rounded bg-yellow-100 text-yellow-700 mr-2"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteEmployee(emp.id)}
+                            className="px-3 py-1 rounded bg-red-100 text-red-700"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -402,7 +400,10 @@ export default function FinanceAdminDashboard() {
 
 /* ------------------------- Sidebar Logos ------------------------- */
 export const Logo = () => (
-  <a href="#" className="flex items-center space-x-2 py-1 text-base font-semibold text-black">
+  <a
+    href="#"
+    className="flex items-center space-x-2 py-1 text-base font-semibold text-black"
+  >
     <img src="/iit.png" alt="IIT Mandi" className="h-8 w-8" />
     <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       IIT Mandi Finance
@@ -411,7 +412,10 @@ export const Logo = () => (
 );
 
 export const LogoIcon = () => (
-  <a href="#" className="flex items-center py-1 text-sm font-semibold text-black">
+  <a
+    href="#"
+    className="flex items-center py-1 text-sm font-semibold text-black"
+  >
     <img src="/iit.png" alt="IIT Mandi" className="h-8 w-8" />
   </a>
 );
