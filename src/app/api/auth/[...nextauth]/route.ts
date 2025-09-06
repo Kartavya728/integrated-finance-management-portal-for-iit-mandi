@@ -1,6 +1,7 @@
 import NextAuth, { type AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import ldap from "ldapjs";
+import { getEmployeeTypeByUserId } from "../../supabase/index";
 
 export const runtime = "nodejs";
 
@@ -40,7 +41,7 @@ async function authenticateWithLDAP(
       // Fail-safe timeout
       const timer = setTimeout(() => done(null), 6000);
 
-      client.bind(dn, password, (err) => {
+      client.bind(dn, password, (err: any) => {
         clearTimeout(timer);
         if (err) return done(null);
         return done({
@@ -51,7 +52,9 @@ async function authenticateWithLDAP(
         });
       });
 
-      client.on("error", () => done(null));
+      client.on("error", (err:any) => {
+        done(null);
+      });
     });
 
     if (attempt) return attempt;
@@ -80,13 +83,17 @@ export const authOptions: AuthOptions = {
           throw new Error("Invalid credentials");
         }
 
-        // Return normalized user object for NextAuth
+        // Fetch employee_type from DB using userId
+        const employee_type = await getEmployeeTypeByUserId(user.uid);
+
+        // Return normalized user object for NextAuth, including employee_type
         return {
           id: user.uid,
           username: user.uid,
           name: user.cn,
           email: user.mail,
           ou: user.ou,
+          employee_type: employee_type || null,
         };
       },
     }),
@@ -103,6 +110,7 @@ export const authOptions: AuthOptions = {
         token.id = (user as any).id;
         token.username = (user as any).username;
         token.ou = (user as any).ou;
+        token.employee_type = (user as any).employee_type;
       }
       return token;
     },
@@ -112,6 +120,7 @@ export const authOptions: AuthOptions = {
         id: token.id as string,
         username: token.username as string,
         ou: token.ou as string,
+        employee_type: token.employee_type as string,
       };
       return session;
     },

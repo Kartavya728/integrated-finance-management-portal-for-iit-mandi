@@ -75,8 +75,9 @@ const { data: balanceData, error } = await supabase
   .from("pda_balances")
   .select("balance")
   .eq("employee_id", username)
-  .single<PdaBalanceRow>();
-  if (error) {
+  .maybeSingle<PdaBalanceRow>();
+  
+if (error) {
   console.error("Error fetching balance:", error.message);
   setBalance(0);
 } else {

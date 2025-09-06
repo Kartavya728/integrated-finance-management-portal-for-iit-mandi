@@ -1,35 +1,16 @@
-"use client"
-import { supabase } from "@/lib/supabaseClient";
+import { createClient } from "@supabase/supabase-js";
+
+// Server-side Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 
 
 export default supabase;
 
 export async function getEmployeeTypeByUserId(userId: string): Promise<string | null> {
-  console.log(userId)
-  console.log(userId)
-  console.log(userId)
-
-  console.log(userId)
-  console.log(userId)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  console.log(userId)
- 
   const { data, error } = await supabase
     .from('employees') 
     .select('employee_type')
@@ -39,7 +20,6 @@ export async function getEmployeeTypeByUserId(userId: string): Promise<string | 
   if (error || !data) {
     return null;
   }
-  console.log(data.employee_type)
-  console.log(1)
+
   return data.employee_type;
 }
