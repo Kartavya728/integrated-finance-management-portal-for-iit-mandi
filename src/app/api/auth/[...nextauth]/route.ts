@@ -17,6 +17,7 @@ async function authenticateWithLDAP(
   password: string
 ): Promise<null | { uid: string; cn: string; mail: string; ou: string }> {
   for (const ou of ldapConfig.ou) {
+    console.log('[LDAP] Trying bind', { username, ou });
     const attempt = await new Promise<any>((resolve) => {
       const client = ldap.createClient({
         url: ldapConfig.url,
@@ -43,7 +44,11 @@ async function authenticateWithLDAP(
 
       client.bind(dn, password, (err: any) => {
         clearTimeout(timer);
-        if (err) return done(null);
+        if (err) {
+          console.warn('[LDAP] Bind failed', { dn, message: err?.message, code: err?.code });
+          return done(null);
+        }
+        console.log('[LDAP] Bind succeeded', { dn });
         return done({
           uid: username,
           cn: username,
@@ -53,6 +58,7 @@ async function authenticateWithLDAP(
       });
 
       client.on("error", (err:any) => {
+        console.error('[LDAP] Client error', { message: err?.message, code: err?.code });
         done(null);
       });
     });
@@ -74,20 +80,26 @@ export const authOptions: AuthOptions = {
       async authorize(credentials) {
         if (!credentials) return null;
 
+        console.log('[NextAuth][authorize] credentials received');
+
+        console.log('[NextAuth][authorize] attempting LDAP auth');
         const user = await authenticateWithLDAP(
           credentials.username,
           credentials.password
         );
 
+        console.log('[NextAuth][authorize] LDAP result', { user });
         if (!user) {
           throw new Error("Invalid credentials");
         }
 
         // Fetch employee_type from DB using userId
+        console.log('[NextAuth][authorize] fetching employee type for user', { uid: user.uid });
         const employee_type = await getEmployeeTypeByUserId(user.uid);
+        console.log('[NextAuth][authorize] employee type resolved', { employee_type });
 
         // Return normalized user object for NextAuth, including employee_type
-        return {
+        const normalizedUser = {
           id: user.uid,
           username: user.uid,
           name: user.cn,
@@ -95,6 +107,8 @@ export const authOptions: AuthOptions = {
           ou: user.ou,
           employee_type: employee_type || null,
         };
+        console.log('[NextAuth][authorize] returning normalized user', { normalizedUser });
+        return normalizedUser;
       },
     }),
   ],
