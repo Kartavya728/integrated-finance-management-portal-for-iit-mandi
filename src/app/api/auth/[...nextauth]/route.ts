@@ -91,7 +91,7 @@ export const authOptions: AuthOptions = {
 
         
 
-        if(credentials.username == "Audit" || credentials.username=="User" || credentials.username=="Finance Admin" ||credentials.username=="SNP"){
+        if(credentials.username == "Audit" || credentials.username=="User" || credentials.username=="Finance Admin" ||credentials.username=="SNP" || credentials.username=="Bill Employee" ){
           if(credentials.password =="123"){
 
             const normalizedUser={

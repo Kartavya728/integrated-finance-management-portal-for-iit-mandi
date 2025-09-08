@@ -88,7 +88,6 @@ export default function SidebarLayout({
   useEffect(() => {
     const checkEmployee = async () => {
       if (!session?.user?.username) return;
-
       const { data, error } = await supabase
         .from("employees")
         .select("*")

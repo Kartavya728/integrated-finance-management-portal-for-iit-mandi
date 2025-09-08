@@ -1,4 +1,4 @@
-import { supabase } from '@/utils/supabase/client'
+import { supabase } from '../../utils/supabase/client'
 import { Employee, EmployeeInsert, EmployeeUpdate, EmployeeWithPDABalance } from '@/types/database'
 
 export const employeesService = {

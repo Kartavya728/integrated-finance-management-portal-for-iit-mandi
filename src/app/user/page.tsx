@@ -101,7 +101,6 @@ if (error) {
 
   const links = [
     { label: "Dashboard", href: "/user", icon: <IconWallet className="h-5 w-5 shrink-0 text-neutral-700" /> },
-    { label: "Apply for Bill", href: "/apply-bill", icon: <IconReceipt2 className="h-5 w-5 shrink-0 text-neutral-700" /> },
   ];
 
   return (

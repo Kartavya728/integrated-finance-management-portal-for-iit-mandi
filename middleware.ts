@@ -7,6 +7,7 @@ const routeMap: Record<string, string> = {
   'Finance Admin': '/finance-admin',
   'Finance Employee': '/finance-employee',
   'Audit': '/audit',
+  'Bill Employee':'/apply-bill',
   'Student Purchase': '/student-purchase',
 };
 
@@ -96,6 +97,7 @@ export const config = {
   matcher: [
     '/login',
     '/user',
+    '/apply-bill/:path*',
     '/finance-admin/:path*', 
     '/finance-employee/:path*', 
     '/audit/:path*', 

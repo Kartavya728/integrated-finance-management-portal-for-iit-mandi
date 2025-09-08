@@ -144,11 +144,13 @@ export default function SnpDashboard() {
     }
   };
 
-  // filtered bills
-  const filteredBills =
-    activeFilter === "All"
-      ? bills
-      : bills.filter((b) => b.snp === activeFilter);
+  // Only show bills where snp is Pending, Hold, or Reject
+const allowedSnpStatuses = ["Pending", "Hold", "Reject"];
+
+const filteredBills =
+  activeFilter === "All"
+    ? bills.filter((b) => allowedSnpStatuses.includes(b.snp))
+    : bills.filter((b) => b.snp === activeFilter);
 
   const pendingCount = bills.filter((b) => b.snp === "Pending").length;
 

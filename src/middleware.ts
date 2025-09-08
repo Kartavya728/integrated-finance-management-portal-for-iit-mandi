@@ -6,6 +6,7 @@ import { getToken } from 'next-auth/jwt';
 const routeMap: Record<string, string> = {
   'Finance Admin': '/finance-admin',
   'Finance Employee': '/finance-employee',
+  'Bill Employee':'/apply-bill',
   'Audit': '/audit',
   'Student Purchase': '/student-purchase',
 };
@@ -78,6 +79,7 @@ export const config = {
   matcher: [
     '/login',
     '/user',
+    '/apply-bill/:path*',
     '/finance-admin/:path*', 
     '/finance-employee/:path*', 
     '/audit/:path*', 
