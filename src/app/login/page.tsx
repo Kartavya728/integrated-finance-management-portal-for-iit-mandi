@@ -28,9 +28,9 @@ export default function LoginPage() {
       const userId = session?.user?.id;
 
       if (userId) {
-        const employee = await getEmployeeByCode(userId);
+        const session = await getSession();
+        const employeeType = session?.user?.employee_type;
 
-        // 🔑 Map DB values to actual page routes
         const routeMap: Record<string, string> = {
           "Finance Admin": "/finance-admin",
           "Finance Employee": "/finance-employee",
@@ -38,16 +38,8 @@ export default function LoginPage() {
           "Student Purchase": "/student-purchase",
         };
 
-        // ✅ if employee exists and has valid type → redirect accordingly
-        if (employee?.employee_type && routeMap[employee.employee_type]) {
-          window.location.href = routeMap[employee.employee_type];
-        } else {
-          // 🚨 if not in DB → redirect to /user
-          window.location.href = "/user";
-        }
-      } else {
-        // 🚨 if no userId → redirect to /user
-        window.location.href = "/user";
+        window.location.href = employeeType && routeMap[employeeType] ? routeMap[employeeType] : "/user";
+        
       }
     }
     setLoading(false);
