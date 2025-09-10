@@ -107,10 +107,10 @@ if (error) {
     <div className="flex w-screen h-screen overflow-hidden">
       {/* Sidebar */}
       <Sidebar open={open} setOpen={setOpen}>
-        <SidebarBody className="justify-between gap-10">
+        <SidebarBody className="justify-between gap-6 md:gap-10">
           <div className="flex flex-1 flex-col overflow-y-auto">
             {open ? <Logo /> : <LogoIcon />}
-            <div className="mt-8 flex flex-col gap-2">
+            <div className="mt-4 md:mt-8 flex flex-col gap-2">
               {links.map((link, idx) => (
                 <SidebarLink key={idx} link={link} />
               ))}
@@ -146,28 +146,28 @@ if (error) {
       </Sidebar>
 
       {/* Main Dashboard */}
-      <div className="flex-1 flex flex-col bg-white overflow-y-auto p-6">
+      <div className="flex-1 flex flex-col bg-white overflow-y-auto p-3 md:p-6">
         {loading ? (
           <p className="text-gray-500">Loading dashboard...</p>
         ) : (
           <>
             {/* Welcome + Balance */}
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-gray-900">
+            <div className="mb-4 md:mb-6">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900">
                 Welcome, {employee?.name || session?.user?.username}
               </h1>
-              <p className="text-gray-600 text-sm">Integrated Finance Management Portal - IIT Mandi</p>
+              <p className="text-gray-600 text-xs md:text-sm">Integrated Finance Management Portal - IIT Mandi</p>
             </div>
 
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 mb-4">
               <button
                 onClick={() => setShowBalance(!showBalance)}
-                className="px-4 py-2 rounded bg-gray-800 text-white hover:bg-gray-900"
+                className="px-3 py-1.5 md:px-4 md:py-2 text-sm md:text-base rounded bg-gray-800 text-white hover:bg-gray-900"
               >
                 {showBalance ? "Hide PDA Balance" : "Show PDA Balance"}
               </button>
               {showBalance && (
-                <p className="text-lg font-semibold text-green-600">
+                <p className="text-base md:text-lg font-semibold text-green-600">
                   PDA Balance: ₹{balance.toLocaleString()}
                 </p>
               )}
@@ -178,9 +178,9 @@ if (error) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.4 }}
-              className="rounded-lg border border-gray-200 bg-gray-50 p-6 shadow-sm"
+              className="rounded-lg border border-gray-200 bg-gray-50 p-3 md:p-6 shadow-sm"
             >
-              <h2 className="text-lg font-semibold text-gray-800">
+              <h2 className="text-base md:text-lg font-semibold text-gray-800">
                 Recent Bill Applications
               </h2>
               {bills.length === 0 ? (
@@ -236,39 +236,42 @@ if (error) {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3 }}
-                        className={`rounded-xl p-4 ${borderClasses}`}
+                        className={`rounded-xl p-3 md:p-4 ${borderClasses}`}
                       >
-                        <h3 className={`text-md ${titleClasses}`}>
+                        <h3 className={`text-sm md:text-md ${titleClasses}`}>
                           {bill.item_description || "No description"}
                         </h3>
-                        <p className="mt-1 text-gray-600">
+                        <p className="mt-1 text-xs md:text-sm text-gray-600">
                           Qty: {bill.qty || 0} | Amount: ₹{bill.po_value || 0}
                         </p>
-                        <hr className="my-2 border-gray-200" />
-                        <p className="text-sm font-semibold text-gray-800">
+                        <hr className="my-1.5 md:my-2 border-gray-200" />
+                        <p className="text-xs md:text-sm font-semibold text-gray-800">
                           Status: {statusLabel}
                         </p>
 
-                        <div className="mt-2">
+                        <div className="mt-1.5 md:mt-2">
                           {remarksDisplay.length > 0 ? (
                             remarksDisplay.map((r, idx) => (
-                              <p key={idx} className="text-md font-bold text-gray-700 mt-1">
+                              <p key={idx} className="text-xs md:text-sm font-bold text-gray-700 mt-0.5 md:mt-1">
                                 {r}
                               </p>
                             ))
                           ) : (
-                            <p className="text-md font-bold text-gray-500">
+                            <p className="text-xs md:text-sm font-bold text-gray-500">
                               Remark: No remark added yet
                             </p>
                           )}
                         </div>
 
-                        <div className="flex justify-end mt-3">
+                        <div className="flex justify-end mt-2 md:mt-3">
                           <button
-                            onClick={() => setSelectedBill(bill)}
-                            className="flex items-center gap-1 text-sm px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedBill(bill);
+                            }}
+                            className="flex items-center gap-1 text-xs md:text-sm px-2 md:px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
                           >
-                            <IconEye size={16} /> View Details
+                            <IconEye size={14} className="md:w-4 md:h-4" /> View Details
                           </button>
                         </div>
                       </motion.div>
@@ -285,27 +288,28 @@ if (error) {
       <AnimatePresence>
         {selectedBill && (
           <motion.div
-            className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
+            className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-2 md:p-0"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white p-6 rounded-lg shadow-lg w-11/12 max-w-3xl overflow-y-auto max-h-[90vh]"
+              className="bg-white p-3 md:p-6 rounded-lg shadow-lg w-full max-w-3xl overflow-y-auto max-h-[90vh]"
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
             >
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Bill Details</h2>
+              <div className="flex justify-between items-center mb-3 md:mb-4">
+                <h2 className="text-lg md:text-xl font-bold">Bill Details</h2>
                 <button
                   onClick={() => setSelectedBill(null)}
-                  className="text-gray-600 hover:text-black"
+                  className="text-gray-600 hover:text-black p-1"
+                  aria-label="Close"
                 >
-                  <IconX size={20} />
+                  <IconX size={18} className="md:w-5 md:h-5" />
                 </button>
               </div>
-              <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+              <pre className="text-xs md:text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">
                 {JSON.stringify(selectedBill, null, 2)}
               </pre>
             </motion.div>

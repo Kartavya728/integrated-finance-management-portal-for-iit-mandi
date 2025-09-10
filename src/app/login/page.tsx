@@ -24,37 +24,46 @@ export default function LoginPage() {
     if (res?.error) {
       setError("Login failed");
     } else if (res?.ok) {
-      const session = await getSession();
-      const userId = session?.user?.id;
-
-      if (userId) {
+      try {
         const session = await getSession();
-        const employeeType = session?.user?.employee_type;
+        const userId = session?.user?.id;
 
-        const routeMap: Record<string, string> = {
-          "Finance Admin": "/finance-admin",
-          "Finance Employee": "/finance-employee",
-          'Bill Employee':'/apply-bill',
-          "Audit": "/audit",
-          "Student Purchase": "/student-purchase",
-        };
+        if (userId) {
+          const employeeType = session?.user?.employee_type;
+          console.log("Login successful, employee type:", employeeType);
 
-        window.location.href = employeeType && routeMap[employeeType] ? routeMap[employeeType] : "/user";
-        
+          const routeMap: Record<string, string> = {
+            "Finance Admin": "/finance-admin",
+            "Finance Employee": "/finance-employee",
+            'Bill Employee':"/apply-bill",
+            "Audit": "/audit",
+            "Student Purchase": "/student-purchase",
+          };
+
+          const redirectUrl = employeeType && routeMap[employeeType] ? routeMap[employeeType] : "/user";
+          console.log("Redirecting to:", redirectUrl);
+          window.location.href = redirectUrl;
+        }
+      } catch (err) {
+        console.error("Error during login redirection:", err);
+        setError("Error during login. Please try again.");
       }
     }
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#217093]">
-      <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
-        <h2 className="text-3xl font-semibold text-center mb-6">Log In</h2>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#217093] px-4 sm:px-6">
+      <div className="bg-white rounded-lg shadow-lg p-5 sm:p-8 w-full max-w-md">
+        <div className="flex justify-center mb-4 sm:mb-6">
+          <img src="/iit.png" alt="IIT Mandi" className="h-12 w-12" />
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-semibold text-center mb-4 sm:mb-6">Log In</h2>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:gap-4">
           <input
             type="text"
             placeholder="LDAP-Username*"
-            className="border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="border rounded px-3 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-400"
             value={username}
             onChange={e => setUsername(e.target.value)}
             required
@@ -62,21 +71,24 @@ export default function LoginPage() {
           <input
             type="password"
             placeholder="LDAP-Password*"
-            className="border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="border rounded px-3 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-400"
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
           />
           {error && (
-            <div className="text-red-500 text-sm text-center">{error}</div>
+            <div className="text-red-500 text-xs sm:text-sm text-center">{error}</div>
           )}
           <button
             type="submit"
-            className="mt-2 bg-blue-600 text-white font-semibold rounded px-3 py-2 hover:bg-blue-700 transition disabled:opacity-50"
+            className="mt-2 bg-blue-600 text-white font-semibold rounded px-3 py-2 text-sm sm:text-base hover:bg-blue-700 transition disabled:opacity-50"
             disabled={loading}
           >
             {loading ? "Logging in..." : "Log In"}
           </button>
+          <p className="text-center text-xs sm:text-sm text-gray-500 mt-4">
+            Integrated Finance Management Portal - IIT Mandi
+          </p>
         </form>
       </div>
     </div>

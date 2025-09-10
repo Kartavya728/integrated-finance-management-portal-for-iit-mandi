@@ -184,6 +184,8 @@ export const authOptions: AuthOptions = {
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
+  // Ensure proper URL handling for Vercel deployment
+  trustHost: true,
 };
 
 const handler = NextAuth(authOptions);

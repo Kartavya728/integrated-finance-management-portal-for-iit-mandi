@@ -255,8 +255,15 @@ export default function FinanceAdminDashboard() {
                         "bg-gray-200 font-medium"
                     )}
                   >
-                    {link.icon}
-                    {open && <span>{link.label}</span>}
+                    <div className="min-w-[24px] flex justify-center">
+                      {link.icon}
+                    </div>
+                    <span className={cn(
+                      "transition-all duration-200", 
+                      open ? "opacity-100" : "opacity-0 md:hidden"
+                    )}>
+                      {link.label}
+                    </span>
                   </button>
                 )
               )}
@@ -264,8 +271,15 @@ export default function FinanceAdminDashboard() {
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-left w-full mt-4"
               >
-                <IconArrowLeft className="h-5 w-5 shrink-0 text-neutral-700" />
-                {open && <span>Logout</span>}
+                <div className="min-w-[24px] flex justify-center">
+                  <IconArrowLeft className="h-5 w-5 shrink-0 text-neutral-700" />
+                </div>
+                <span className={cn(
+                  "transition-all duration-200", 
+                  open ? "opacity-100" : "opacity-0 md:hidden"
+                )}>
+                  Logout
+                </span>
               </button>
             </div>
           </div>
@@ -273,7 +287,7 @@ export default function FinanceAdminDashboard() {
       </Sidebar>
 
       {/* Main Content */}
-      <div className="flex flex-1 p-4 overflow-y-auto bg-gray-50">
+      <div className="flex flex-1 p-2 md:p-4 overflow-y-auto bg-gray-50">
         {activePage === "dashboard" && (
           <div className="w-full">
             <h1 className="text-2xl font-semibold mb-6">
@@ -281,32 +295,30 @@ export default function FinanceAdminDashboard() {
             </h1>
 
             {/* Stats */}
-            <div className="grid grid-cols-5 gap-6 mb-8">
-              <motion.div className="rounded-lg bg-white shadow p-6 border">
-                <h2 className="text-gray-600">Total Bills</h2>
-                <p className="text-2xl font-bold">{totalBills}</p>
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6 mb-8">
+              <motion.div className="rounded-lg bg-white shadow p-4 md:p-6 border">
+                <h2 className="text-gray-600 text-sm md:text-base">Total Bills</h2>
+                <p className="text-xl md:text-2xl font-bold">{totalBills}</p>
               </motion.div>
-              <motion.div className="rounded-lg bg-green-100 shadow p-6 border">
-                <h2 className="text-gray-600">Approved</h2>
-                <p className="text-2xl font-bold text-green-700">
+              <motion.div className="rounded-lg bg-green-100 shadow p-4 md:p-6 border">
+                <h2 className="text-gray-600 text-sm md:text-base">Approved</h2>
+                <p className="text-xl md:text-2xl font-bold text-green-700">
                   {approvedCount}
                 </p>
               </motion.div>
-              <motion.div className="rounded-lg bg-yellow-100 shadow p-6 border">
-                <h2 className="text-gray-600">Hold</h2>
-                <p className="text-2xl font-bold text-yellow-700">
+              <motion.div className="rounded-lg bg-yellow-100 shadow p-4 md:p-6 border">
+                <h2 className="text-gray-600 text-sm md:text-base">Hold</h2>
+                <p className="text-xl md:text-2xl font-bold text-yellow-700">
                   {holdCount}
                 </p>
               </motion.div>
-              <motion.div className="rounded-lg bg-red-100 shadow p-6 border">
-                <h2 className="text-gray-600">Rejected</h2>
-                <p className="text-2xl font-bold text-red-700">
-                  {rejectCount}
-                </p>
+              <motion.div className="rounded-lg bg-red-100 shadow p-4 md:p-6 border">
+                <h2 className="text-gray-600 text-sm md:text-base">Rejected</h2>
+                <p className="text-xl md:text-2xl font-bold text-red-700">{rejectCount}</p>
               </motion.div>
-              <motion.div className="rounded-lg bg-blue-100 shadow p-6 border">
-                <h2 className="text-gray-600">Pending</h2>
-                <p className="text-2xl font-bold text-blue-700">
+              <motion.div className="rounded-lg bg-blue-100 shadow p-4 md:p-6 border">
+                <h2 className="text-gray-600 text-sm md:text-base">Pending</h2>
+                <p className="text-xl md:text-2xl font-bold text-blue-700">
                   {pendingCount}
                 </p>
               </motion.div>
@@ -317,12 +329,12 @@ export default function FinanceAdminDashboard() {
         {/* Review Bills Page */}
         {activePage === "review-bills" && (
           <div className="w-full">
-            <h2 className="text-2xl font-semibold mb-6">Review All Bills</h2>
+            <h2 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6">Review All Bills</h2>
 
             {loading ? (
               <p>Loading bills...</p>
             ) : (
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 gap-3 md:gap-4">
                 {bills.map((bill) => {
                   const isExpanded = expandedBill === bill.id;
                   const locked =
@@ -333,24 +345,24 @@ export default function FinanceAdminDashboard() {
                     <div
                       key={bill.id}
                       className={cn(
-                        "rounded-lg p-4 shadow cursor-pointer bg-white",
+                        "rounded-lg p-3 md:p-4 shadow cursor-pointer bg-white",
                         bill.finance_admin === "Approved"
-                          ? "border-4 border-green-500"
+                          ? "border-2 md:border-4 border-green-500"
                           : bill.finance_admin === "Reject"
-                          ? "border-4 border-red-500"
+                          ? "border-2 md:border-4 border-red-500"
                           : bill.finance_admin === "Hold"
-                          ? "border-4 border-yellow-500"
+                          ? "border-2 md:border-4 border-yellow-500"
                           : "border border-gray-300"
                       )}
                       onClick={() =>
                         setExpandedBill(isExpanded ? null : bill.id)
                       }
                     >
-                      <h2 className="text-lg font-semibold text-gray-800">
+                      <h2 className="text-base md:text-lg font-semibold text-gray-800">
                         {bill.po_details} – {bill.supplier_name}
                       </h2>
-                      <p className="text-gray-600">Value: ₹ {bill.po_value}</p>
-                      <p className="text-sm font-medium">
+                      <p className="text-sm md:text-base text-gray-600">Value: ₹ {bill.po_value}</p>
+                      <p className="text-xs md:text-sm font-medium">
                         Status: {bill.finance_admin} at Finance Admin
                       </p>
 
@@ -499,9 +511,9 @@ export default function FinanceAdminDashboard() {
               <table className="min-w-full divide-y divide-gray-200 border rounded bg-white shadow-sm">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="px-6 py-3">PO Details</th>
-                    <th className="px-6 py-3">Department</th>
-                    <th className="px-6 py-3">Remark</th>
+                    <th className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">PO Details</th>
+                    <th className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">Department</th>
+                    <th className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">Remark</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -514,10 +526,9 @@ export default function FinanceAdminDashboard() {
                     )
                     .map((bill) => (
                       <tr key={bill.id}>
-                        <td className="px-6 py-3">{bill.po_details}</td>
-                        <td className="px-6 py-3">{bill.status}</td>
-                        <td className="px-6 py"></td>
-                        <td className="px-6 py-3">
+                        <td className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">{bill.po_details}</td>
+                        <td className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">{bill.status}</td>
+                        <td className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">
                           {bill.remarks || bill.remarks1 || bill.remarks2 || "—"}
                         </td>
                       </tr>

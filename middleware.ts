@@ -14,7 +14,7 @@ const routeMap: Record<string, string> = {
 // List of protected routes
 const protectedRoutes = Object.values(routeMap);
 
-export async function middleware(request: NextRequest) {
+export const middleware = async (request: NextRequest) => {
   const { pathname } = request.nextUrl;
   
   console.log("🚀 Middleware running for pathname:", pathname);
@@ -24,16 +24,17 @@ export async function middleware(request: NextRequest) {
 
   // If accessing login page and already logged in, redirect to appropriate page
   if (pathname === '/login' && token) {
-    const employeeType = token.employee_type;
-    const allowedRoute = routeMap[employeeType as string];
+    const employeeType = token.employee_type as string;
+    console.log("User already logged in, employee type:", employeeType);
     
-    if (employeeType && allowedRoute) {
-      console.log("🔄 Already logged in, redirecting to:", allowedRoute);
-      return NextResponse.redirect(new URL(allowedRoute, request.url));
-    } else {
-      console.log("🔄 Already logged in, redirecting to /user");
-      return NextResponse.redirect(new URL('/user', request.url));
+    if (employeeType && routeMap[employeeType]) {
+      const redirectUrl = new URL(routeMap[employeeType], request.url);
+      console.log("Redirecting to:", redirectUrl.toString());
+      return NextResponse.redirect(redirectUrl);
     }
+    const defaultRedirect = new URL("/user", request.url);
+    console.log("Redirecting to default:", defaultRedirect.toString());
+    return NextResponse.redirect(defaultRedirect);
   }
 
   // If accessing login page and not logged in, allow
@@ -50,8 +51,10 @@ export async function middleware(request: NextRequest) {
 
   // If accessing /user page without token, redirect to login
   if (pathname === '/user' && !token) {
-    console.log("🔄 No token, redirecting to login");
-    return NextResponse.redirect(new URL('/login', request.url));
+    console.log("🔒 Accessing /user without login, redirecting to login");
+    const loginUrl = new URL("/login", request.url);
+    console.log("Redirecting to login:", loginUrl.toString());
+    return NextResponse.redirect(loginUrl);
   }
 
   // For all other routes, check if they are protected
@@ -63,7 +66,9 @@ export async function middleware(request: NextRequest) {
   // Protected routes - must be logged in
   if (!token) {
     console.log("🔄 No token for protected route, redirecting to login");
-    return NextResponse.redirect(new URL('/login', request.url));
+    const loginUrl = new URL('/login', request.url);
+    console.log("Redirecting to login:", loginUrl.toString());
+    return NextResponse.redirect(loginUrl);
   }
 
   // Check employee_type for protected routes
@@ -79,7 +84,9 @@ export async function middleware(request: NextRequest) {
   // If employee_type is missing or not valid, redirect to /user
   if (!employeeType || !allowedRoute) {
     console.log("❌ Invalid employee type, redirecting to /user");
-    return NextResponse.redirect(new URL('/user', request.url));
+    const userUrl = new URL('/user', request.url);
+    console.log("Redirecting to user:", userUrl.toString());
+    return NextResponse.redirect(userUrl);
   }
 
   // If trying to access their allowed route, allow
@@ -90,7 +97,9 @@ export async function middleware(request: NextRequest) {
 
   // Otherwise, redirect to /user
   console.log("❌ Accessing unauthorized route, redirecting to /user");
-  return NextResponse.redirect(new URL('/user', request.url));
+  const userUrl = new URL('/user', request.url);
+  console.log("Redirecting to user:", userUrl.toString());
+  return NextResponse.redirect(userUrl);
 }
 
 export const config = {
