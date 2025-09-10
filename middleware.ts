@@ -21,6 +21,7 @@ export const middleware = async (request: NextRequest) => {
 
   // Get the user's session token
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  console.log("[Middleware] token:", token);
 
   // If accessing login page and already logged in, redirect to appropriate page
   if (pathname === '/login' && token) {
