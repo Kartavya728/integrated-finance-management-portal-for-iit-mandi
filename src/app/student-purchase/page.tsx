@@ -209,13 +209,7 @@ const filteredBills =
 
           {/* Bottom links */}
           <div className="flex flex-col gap-2">
-            <SidebarLink
-              link={{
-                label: "Back to User Page",
-                href: "/user",
-                icon: <IconHome className="h-5 w-5 shrink-0 text-blue-600" />,
-              }}
-            />
+
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-left w-full"

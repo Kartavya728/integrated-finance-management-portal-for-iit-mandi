@@ -337,11 +337,7 @@ export default function FinanceAdminDashboard() {
       icon: <IconUsers className="h-5 w-5 shrink-0 text-green-600" />,
       onClick: () => setActivePage("employees"),
     },
-    {
-      label: "Back to User Page",
-      href: "/user",
-      icon: <IconHome className="h-5 w-5 shrink-0 text-blue-600" />,
-    },
+
   ];
 
   const formatBillDetails = (bill: Bill) => {

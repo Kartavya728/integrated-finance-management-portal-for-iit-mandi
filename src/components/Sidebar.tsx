@@ -39,10 +39,7 @@ const getNavigationItems = (
   ];
 
   if (!isEmployee) {
-    return [
-      ...baseItems,
-      { title: "My Bills", url: "/user", icon: FileText },
-    ];
+    return [...baseItems]; // removed "My Bills"
   }
 
   if (employeeType === "Finance Admin") {
@@ -71,6 +68,7 @@ const getNavigationItems = (
 
   return baseItems;
 };
+
 
 export default function SidebarLayout({
   children,
