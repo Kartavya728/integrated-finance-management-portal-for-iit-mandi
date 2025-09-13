@@ -440,3 +440,22 @@ export const LogoIcon = () => (
     <img src="/iit.png" alt="IIT Mandi" className="h-8 w-8" />
   </a>
 );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

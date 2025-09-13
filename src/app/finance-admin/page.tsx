@@ -13,7 +13,11 @@ import {
   IconFileText,
   IconCheck,
   IconX,
-  IconCode,
+  IconEye,
+  IconEdit,
+  IconTrash,
+  IconPlus,
+  IconLock,
 } from "@tabler/icons-react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -30,11 +34,15 @@ interface Bill {
   finance_admin: string;
   created_at?: string;
   employee_id: string;
+  employee_name: string;
   item_description?: string;
+  item_category?: string;
   qty?: number;
   remarks?: string; // finance remark
-  remarks1?: string; // audit remark
-  remarks2?: string; // snp remark
+  remarks1?: string; // snp remark
+  remarks2?: string; // audit remark
+  remarks3?: string; // other remark
+  remarks4?: string; // additional remark
 }
 
 interface Employee {
@@ -43,6 +51,7 @@ interface Employee {
   name: string;
   email: string;
   department: string;
+  employee_type: string;
 }
 
 type PageView = "dashboard" | "review-bills" | "hold-bills" | "employees";
@@ -58,11 +67,27 @@ export default function FinanceAdminDashboard() {
   const [activePage, setActivePage] = useState<PageView>("dashboard");
 
   const [editingEmployee, setEditingEmployee] = useState<string | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordAction, setPasswordAction] = useState<string>("");
+  const [enteredPassword, setEnteredPassword] = useState("");
+  const [targetEmployeeId, setTargetEmployeeId] = useState("");
 
   // for bill actions
   const [expandedBill, setExpandedBill] = useState<string | null>(null);
   const [remarks, setRemarks] = useState<{ [key: string]: string }>({});
-  const [jsonView, setJsonView] = useState<string | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedBillDetails, setSelectedBillDetails] = useState<Bill | null>(null);
+
+  // Add employee form
+  const [showAddEmployeeForm, setShowAddEmployeeForm] = useState(false);
+  const [newEmployee, setNewEmployee] = useState({
+    username: "",
+    name: "",
+    email: "",
+    department: "User",
+  });
+
+  const FINANCE_ADMIN_PASSWORD = "admin123"; // In production, this should be in environment variables
 
   // fetch bills
   useEffect(() => {
@@ -100,6 +125,44 @@ export default function FinanceAdminDashboard() {
     if (activePage === "employees") fetchEmployees();
   }, [activePage]);
 
+  /* ---------- Password Protection ---------- */
+  const handlePasswordAction = (action: string, employeeId?: string) => {
+    setPasswordAction(action);
+    setTargetEmployeeId(employeeId || "");
+    setShowPasswordModal(true);
+    setEnteredPassword("");
+  };
+
+  const verifyPassword = () => {
+    if (enteredPassword !== FINANCE_ADMIN_PASSWORD) {
+      alert("Incorrect password!");
+      return false;
+    }
+    setShowPasswordModal(false);
+    setEnteredPassword("");
+    return true;
+  };
+
+  const executePasswordProtectedAction = async () => {
+    if (!verifyPassword()) return;
+
+    switch (passwordAction) {
+      case "delete":
+        if (targetEmployeeId) {
+          await handleDeleteEmployee(targetEmployeeId);
+        }
+        break;
+      case "add":
+        setShowAddEmployeeForm(true);
+        break;
+      case "edit":
+        if (targetEmployeeId) {
+          setEditingEmployee(targetEmployeeId);
+        }
+        break;
+    }
+  };
+
   /* ---------- Bill Actions ---------- */
   const handleApprove = async (bill: Bill) => {
     try {
@@ -116,8 +179,10 @@ export default function FinanceAdminDashboard() {
             : b
         )
       );
+      alert("Bill approved successfully!");
     } catch (err) {
       console.error("Error approving bill:", err);
+      alert("Error approving bill");
     }
   };
 
@@ -140,8 +205,10 @@ export default function FinanceAdminDashboard() {
             : b
         )
       );
+      alert("Bill put on hold!");
     } catch (err) {
       console.error("Error holding bill:", err);
+      alert("Error holding bill");
     }
   };
 
@@ -164,36 +231,81 @@ export default function FinanceAdminDashboard() {
             : b
         )
       );
+      alert("Bill rejected!");
     } catch (err) {
       console.error("Error rejecting bill:", err);
+      alert("Error rejecting bill");
     }
   };
 
   /* ---------- Employee Actions ---------- */
   const handleDeleteEmployee = async (id: string) => {
-    await supabase.from("employees").delete().eq("id", id);
-    setEmployees((prev) => prev.filter((e) => e.id !== id));
+    try {
+      const { error } = await supabase.from("employees").delete().eq("id", id);
+      if (error) throw error;
+      
+      setEmployees((prev) => prev.filter((e) => e.id !== id));
+      alert("Employee deleted successfully!");
+    } catch (err) {
+      console.error("Error deleting employee:", err);
+      alert("Error deleting employee");
+    }
   };
 
-  const handleUpdateDepartment = async (id: string, dept: string) => {
-    await supabase.from("employees").update({ department: dept }).eq("id", id);
-    setEmployees((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, department: dept } : e))
-    );
-    setEditingEmployee(null);
+  const handleUpdateEmployee = async (id: string, updates: Partial<Employee>) => {
+    try {
+      const { error } = await supabase
+        .from("employees")
+        .update(updates)
+        .eq("id", id);
+      if (error) throw error;
+
+      setEmployees((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, ...updates } : e))
+      );
+      setEditingEmployee(null);
+      alert("Employee updated successfully!");
+    } catch (err) {
+      console.error("Error updating employee:", err);
+      alert("Error updating employee");
+    }
   };
 
   const handleAddEmployee = async () => {
-    const username = prompt("Enter username:");
-    const name = prompt("Enter name:");
-    const email = prompt("Enter email:");
-    const department = prompt("Enter department:");
-    if (!username || !name) return;
-    const { data, error } = await supabase
-      .from("employees")
-      .insert([{ username, name, email, department }])
-      .select();
-    if (!error && data) setEmployees((prev) => [...prev, ...data]);
+    try {
+      if (!newEmployee.username || !newEmployee.name) {
+        alert("Username and name are required!");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("employees")
+        .insert([{
+          username: newEmployee.username,
+          name: newEmployee.name,
+          email: newEmployee.email,
+          department: newEmployee.department,
+          employee_type: newEmployee.department,
+        }])
+        .select();
+
+      if (error) throw error;
+      
+      if (data) {
+        setEmployees((prev) => [...prev, ...data]);
+        setNewEmployee({
+          username: "",
+          name: "",
+          email: "",
+          department: "User",
+        });
+        setShowAddEmployeeForm(false);
+        alert("Employee added successfully!");
+      }
+    } catch (err) {
+      console.error("Error adding employee:", err);
+      alert("Error adding employee");
+    }
   };
 
   /* ---------- Stats ---------- */
@@ -232,7 +344,38 @@ export default function FinanceAdminDashboard() {
     },
   ];
 
-  /* ---------- Render Pages ---------- */
+  const formatBillDetails = (bill: Bill) => {
+    return {
+      basicInfo: {
+        id: bill.id,
+        employeeId: bill.employee_id,
+        employeeName: bill.employee_name,
+        submittedAt: bill.created_at ? new Date(bill.created_at).toLocaleString() : "N/A",
+      },
+      purchaseDetails: {
+        poDetails: bill.po_details || "N/A",
+        supplierName: bill.supplier_name || "N/A",
+        itemDescription: bill.item_description || "N/A",
+        itemCategory: bill.item_category || "N/A",
+        quantity: bill.qty || 0,
+        totalValue: bill.po_value || 0,
+      },
+      workflowStatus: {
+        overall: bill.status,
+        snpStatus: bill.snp || "N/A",
+        auditStatus: bill.audit || "N/A",
+        financeAdminStatus: bill.finance_admin || "N/A",
+      },
+      departmentRemarks: {
+        snp: bill.remarks1 || "No remark",
+        audit: bill.remarks2 || "No remark", 
+        financeAdmin: bill.remarks || "No remark",
+        other: bill.remarks3 || "No remark",
+        additional: bill.remarks4 || "No remark",
+      }
+    };
+  };
+
   return (
     <div className="flex h-screen w-full bg-white overflow-hidden">
       {/* Sidebar */}
@@ -249,10 +392,10 @@ export default function FinanceAdminDashboard() {
                     key={idx}
                     onClick={link.onClick}
                     className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded text-left w-full",
-                      activePage ===
-                        link.label.toLowerCase().replace(" ", "-") &&
-                        "bg-gray-200 font-medium"
+                      "flex items-center gap-2 px-3 py-2 rounded text-left w-full transition-colors",
+                      activePage === link.label.toLowerCase().replace(" ", "-") 
+                        ? "bg-blue-100 font-medium text-blue-900" 
+                        : "hover:bg-gray-100"
                     )}
                   >
                     <div className="min-w-[24px] flex justify-center">
@@ -287,208 +430,269 @@ export default function FinanceAdminDashboard() {
       </Sidebar>
 
       {/* Main Content */}
-      <div className="flex flex-1 p-2 md:p-4 overflow-y-auto bg-gray-50">
+      <div className="flex flex-1 p-4 overflow-y-auto bg-gray-50">
         {activePage === "dashboard" && (
           <div className="w-full">
-            <h1 className="text-2xl font-semibold mb-6">
+            <motion.h1 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-2xl font-semibold mb-6"
+            >
               Finance Admin Dashboard
-            </h1>
+            </motion.h1>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6 mb-8">
-              <motion.div className="rounded-lg bg-white shadow p-4 md:p-6 border">
-                <h2 className="text-gray-600 text-sm md:text-base">Total Bills</h2>
-                <p className="text-xl md:text-2xl font-bold">{totalBills}</p>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="rounded-lg bg-white shadow p-6 border"
+              >
+                <h2 className="text-gray-600 text-sm">Total Bills</h2>
+                <p className="text-2xl font-bold text-gray-900">{totalBills}</p>
+                <p className="text-xs text-gray-500 mt-1">All submissions</p>
               </motion.div>
-              <motion.div className="rounded-lg bg-green-100 shadow p-4 md:p-6 border">
-                <h2 className="text-gray-600 text-sm md:text-base">Approved</h2>
-                <p className="text-xl md:text-2xl font-bold text-green-700">
-                  {approvedCount}
-                </p>
+
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="rounded-lg bg-green-50 shadow p-6 border border-green-200"
+              >
+                <h2 className="text-gray-600 text-sm">Approved</h2>
+                <p className="text-2xl font-bold text-green-700">{approvedCount}</p>
+                <p className="text-xs text-gray-500 mt-1">Ready for payment</p>
               </motion.div>
-              <motion.div className="rounded-lg bg-yellow-100 shadow p-4 md:p-6 border">
-                <h2 className="text-gray-600 text-sm md:text-base">Hold</h2>
-                <p className="text-xl md:text-2xl font-bold text-yellow-700">
-                  {holdCount}
-                </p>
+
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="rounded-lg bg-yellow-50 shadow p-6 border border-yellow-200"
+              >
+                <h2 className="text-gray-600 text-sm">Hold</h2>
+                <p className="text-2xl font-bold text-yellow-700">{holdCount}</p>
+                <p className="text-xs text-gray-500 mt-1">Needs attention</p>
               </motion.div>
-              <motion.div className="rounded-lg bg-red-100 shadow p-4 md:p-6 border">
-                <h2 className="text-gray-600 text-sm md:text-base">Rejected</h2>
-                <p className="text-xl md:text-2xl font-bold text-red-700">{rejectCount}</p>
+
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="rounded-lg bg-red-50 shadow p-6 border border-red-200"
+              >
+                <h2 className="text-gray-600 text-sm">Rejected</h2>
+                <p className="text-2xl font-bold text-red-700">{rejectCount}</p>
+                <p className="text-xs text-gray-500 mt-1">Not approved</p>
               </motion.div>
-              <motion.div className="rounded-lg bg-blue-100 shadow p-4 md:p-6 border">
-                <h2 className="text-gray-600 text-sm md:text-base">Pending</h2>
-                <p className="text-xl md:text-2xl font-bold text-blue-700">
-                  {pendingCount}
-                </p>
+
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="rounded-lg bg-blue-50 shadow p-6 border border-blue-200"
+              >
+                <h2 className="text-gray-600 text-sm">Pending</h2>
+                <p className="text-2xl font-bold text-blue-700">{pendingCount}</p>
+                <p className="text-xs text-gray-500 mt-1">Awaiting review</p>
               </motion.div>
             </div>
+
+            {/* Recent Activity */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="bg-white rounded-lg shadow border p-6"
+            >
+              <h2 className="text-lg font-semibold mb-4">Recent Bills</h2>
+              {bills.slice(0, 5).length === 0 ? (
+                <p className="text-gray-500">No recent bills</p>
+              ) : (
+                <div className="space-y-3">
+                  {bills.slice(0, 5).map((bill) => (
+                    <div key={bill.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                      <div>
+                        <p className="font-medium text-sm">{bill.item_description || "No description"}</p>
+                        <p className="text-xs text-gray-600">
+                          {bill.employee_name} • ₹{bill.po_value?.toLocaleString()}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        bill.finance_admin === "Approved" ? "bg-green-100 text-green-800" :
+                        bill.finance_admin === "Reject" ? "bg-red-100 text-red-800" :
+                        bill.finance_admin === "Hold" ? "bg-yellow-100 text-yellow-800" :
+                        "bg-blue-100 text-blue-800"
+                      }`}>
+                        {bill.finance_admin || "Pending"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
           </div>
         )}
 
         {/* Review Bills Page */}
         {activePage === "review-bills" && (
           <div className="w-full">
-            <h2 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6">Review All Bills</h2>
+            <h2 className="text-2xl font-semibold mb-6">Review Bills</h2>
 
             {loading ? (
-              <p>Loading bills...</p>
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-3">Loading bills...</span>
+              </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3 md:gap-4">
-                {bills.map((bill) => {
-                  const isExpanded = expandedBill === bill.id;
-                  const locked =
-                    bill.finance_admin === "Approved" ||
-                    bill.finance_admin === "Reject";
+              <div className="space-y-4">
+                {bills
+                  .filter(bill => bill.finance_admin === "Pending" || bill.finance_admin === "Hold")
+                  .map((bill) => {
+                    const isExpanded = expandedBill === bill.id;
+                    const locked = bill.finance_admin === "Approved" || bill.finance_admin === "Reject";
 
-                  return (
-                    <div
-                      key={bill.id}
-                      className={cn(
-                        "rounded-lg p-3 md:p-4 shadow cursor-pointer bg-white",
-                        bill.finance_admin === "Approved"
-                          ? "border-2 md:border-4 border-green-500"
-                          : bill.finance_admin === "Reject"
-                          ? "border-2 md:border-4 border-red-500"
-                          : bill.finance_admin === "Hold"
-                          ? "border-2 md:border-4 border-yellow-500"
-                          : "border border-gray-300"
-                      )}
-                      onClick={() =>
-                        setExpandedBill(isExpanded ? null : bill.id)
-                      }
-                    >
-                      <h2 className="text-base md:text-lg font-semibold text-gray-800">
-                        {bill.po_details} – {bill.supplier_name}
-                      </h2>
-                      <p className="text-sm md:text-base text-gray-600">Value: ₹ {bill.po_value}</p>
-                      <p className="text-xs md:text-sm font-medium">
-                        Status: {bill.finance_admin} at Finance Admin
-                      </p>
-
-                      <AnimatePresence>
-                        {isExpanded && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="mt-3 space-y-2"
-                          >
-                            <p className="text-gray-700">
-                              Item: {bill.item_description}
-                            </p>
-                            <p className="text-gray-700">Qty: {bill.qty}</p>
-
-                            {/* Remarks */}
-                            {bill.remarks && (
-                              <p className="font-bold text-gray-700">
-                                Finance Remark: {bill.remarks}
-                              </p>
-                            )}
-                            {bill.remarks1 && (
-                              <p className="font-bold text-gray-700">
-                                Audit Remark: {bill.remarks1}
-                              </p>
-                            )}
-                            {bill.remarks2 && (
-                              <p className="font-bold text-gray-700">
-                                SnP Remark: {bill.remarks2}
-                              </p>
-                            )}
-
-                            {/* Remark Input */}
-                            {!locked && (
-                              <div className="flex items-center gap-2 mt-2">
-                                <input
-                                  type="text"
-                                  placeholder="Enter remark..."
-                                  value={remarks[bill.id] || ""}
-                                  onChange={(e) =>
-                                    setRemarks((prev) => ({
-                                      ...prev,
-                                      [bill.id]: e.target.value,
-                                    }))
-                                  }
-                                  className="flex-1 px-2 py-1 border rounded"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setJsonView(JSON.stringify(bill, null, 2));
-                                  }}
-                                  className="p-2 rounded bg-gray-200 hover:bg-gray-300"
-                                >
-                                  <IconCode className="h-5 w-5 text-gray-700" />
-                                </button>
-                              </div>
-                            )}
-
-                            {/* Action Buttons */}
-                            {!locked && (
-                              <div className="flex gap-3 mt-3">
-                                {bill.finance_admin === "Pending" && (
-                                  <>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleApprove(bill);
-                                      }}
-                                      className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
-                                    >
-                                      Approve
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleHold(bill);
-                                      }}
-                                      className="px-3 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600"
-                                    >
-                                      Hold
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleReject(bill);
-                                      }}
-                                      className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700"
-                                    >
-                                      Reject
-                                    </button>
-                                  </>
-                                )}
-                                {bill.finance_admin === "Hold" && (
-                                  <>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleApprove(bill);
-                                      }}
-                                      className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
-                                    >
-                                      Approve
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleReject(bill);
-                                      }}
-                                      className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700"
-                                    >
-                                      Reject
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </motion.div>
+                    return (
+                      <motion.div
+                        key={bill.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={cn(
+                          "rounded-lg p-4 shadow cursor-pointer bg-white transition-all",
+                          bill.finance_admin === "Hold" 
+                            ? "border-2 border-yellow-500" 
+                            : "border border-gray-300 hover:border-blue-400"
                         )}
-                      </AnimatePresence>
-                    </div>
-                  );
-                })}
+                        onClick={() => setExpandedBill(isExpanded ? null : bill.id)}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-800">
+                              {bill.item_description || "No description"}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              Employee: {bill.employee_name} | Amount: ₹{bill.po_value?.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Supplier: {bill.supplier_name} | Category: {bill.item_category}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedBillDetails(bill);
+                                setShowDetailModal(true);
+                              }}
+                              className="p-2 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                            >
+                              <IconEye size={16} />
+                            </button>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              bill.finance_admin === "Hold" 
+                                ? "bg-yellow-100 text-yellow-800" 
+                                : "bg-blue-100 text-blue-800"
+                            }`}>
+                              {bill.finance_admin}
+                            </span>
+                          </div>
+                        </div>
+
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.3 }}
+                              className="mt-4 space-y-3 border-t pt-3"
+                            >
+                              {/* Previous Remarks */}
+                              {(bill.remarks1 || bill.remarks2) && (
+                                <div className="bg-gray-50 rounded p-3">
+                                  <p className="text-sm font-medium mb-2">Previous Department Remarks:</p>
+                                  {bill.remarks1 && (
+                                    <p className="text-xs text-gray-700 mb-1">
+                                      <span className="font-medium">SNP:</span> {bill.remarks1}
+                                    </p>
+                                  )}
+                                  {bill.remarks2 && (
+                                    <p className="text-xs text-gray-700">
+                                      <span className="font-medium">Audit:</span> {bill.remarks2}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Current Finance Admin Remark */}
+                              {bill.remarks && (
+                                <div className="bg-blue-50 rounded p-3">
+                                  <p className="text-sm font-medium mb-1">Your Current Remark:</p>
+                                  <p className="text-sm text-gray-700">{bill.remarks}</p>
+                                </div>
+                              )}
+
+                              {/* Remark Input */}
+                              {!locked && (
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Enter your remark..."
+                                    value={remarks[bill.id] || ""}
+                                    onChange={(e) =>
+                                      setRemarks((prev) => ({
+                                        ...prev,
+                                        [bill.id]: e.target.value,
+                                      }))
+                                    }
+                                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Action Buttons */}
+                              {!locked && (
+                                <div className="flex gap-3 pt-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleApprove(bill);
+                                    }}
+                                    className="flex items-center gap-1 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
+                                  >
+                                    <IconCheck size={16} />
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleHold(bill);
+                                    }}
+                                    className="flex items-center gap-1 px-4 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition-colors"
+                                  >
+                                    <IconClockPause size={16} />
+                                    Hold
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleReject(bill);
+                                    }}
+                                    className="flex items-center gap-1 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                  >
+                                    <IconX size={16} />
+                                    Reject
+                                  </button>
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -497,152 +701,445 @@ export default function FinanceAdminDashboard() {
         {/* Hold Bills Page */}
         {activePage === "hold-bills" && (
           <div className="w-full">
-            <h2 className="text-2xl font-semibold mb-6">
-              All Hold Bills (Any Dept)
-            </h2>
+            <h2 className="text-2xl font-semibold mb-6">Hold Bills (All Departments)</h2>
+            
             {bills.filter(
-              (b) =>
-                b.snp === "Hold" ||
-                b.audit === "Hold" ||
-                b.finance_admin === "Hold"
+              (b) => b.snp === "Hold" || b.audit === "Hold" || b.finance_admin === "Hold"
             ).length === 0 ? (
-              <p className="text-gray-500">No hold bills</p>
+              <div className="text-center py-12 bg-white rounded-lg shadow">
+                <IconClockPause className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 text-lg">No bills on hold</p>
+              </div>
             ) : (
-              <table className="min-w-full divide-y divide-gray-200 border rounded bg-white shadow-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">PO Details</th>
-                    <th className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">Department</th>
-                    <th className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">Remark</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bills
-                    .filter(
-                      (b) =>
-                        b.snp === "Hold" ||
-                        b.audit === "Hold" ||
-                        b.finance_admin === "Hold"
-                    )
-                    .map((bill) => (
-                      <tr key={bill.id}>
-                        <td className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">{bill.po_details}</td>
-                        <td className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">{bill.status}</td>
-                        <td className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm">
-                          {bill.remarks || bill.remarks1 || bill.remarks2 || "—"}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Bill Details
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Employee
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Hold By
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Remark
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {bills
+                      .filter((b) => b.snp === "Hold" || b.audit === "Hold" || b.finance_admin === "Hold")
+                      .map((bill) => {
+                        const holdDepartment = 
+                          bill.finance_admin === "Hold" ? "Finance Admin" :
+                          bill.audit === "Hold" ? "Audit" :
+                          bill.snp === "Hold" ? "SNP" : "Unknown";
+                        
+                        const holdRemark = 
+                          bill.finance_admin === "Hold" ? bill.remarks :
+                          bill.audit === "Hold" ? bill.remarks2 :
+                          bill.snp === "Hold" ? bill.remarks1 : "No remark";
+
+                        return (
+                          <tr key={bill.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {bill.item_description || "No description"}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {bill.supplier_name}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {bill.employee_name}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              ₹{bill.po_value?.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">
+                                {holdDepartment}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                              {holdRemark || "No remark"}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <button
+                                onClick={() => {
+                                  setSelectedBillDetails(bill);
+                                  setShowDetailModal(true);
+                                }}
+                                className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                              >
+                                <IconEye size={16} />
+                                View
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
 
-        {/* Employees Page */}
+        {/* Employees Management Page */}
         {activePage === "employees" && (
           <div className="w-full">
-            <h2 className="text-2xl font-semibold mb-6">Manage Employees</h2>
-            <button
-              onClick={handleAddEmployee}
-              className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Add Employee
-            </button>
-            <table className="min-w-full divide-y divide-gray-200 border rounded bg-white shadow-sm">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-6 py-3">Username</th>
-                  <th className="px-6 py-3">Name</th>
-                  <th className="px-6 py-3">Email</th>
-                  <th className="px-6 py-3">Department</th>
-                  <th className="px-6 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {employees.map((emp) => (
-                  <tr key={emp.id}>
-                    <td className="px-6 py-3">{emp.username}</td>
-                    <td className="px-6 py-3">{emp.name}</td>
-                    <td className="px-6 py-3">{emp.email}</td>
-                    <td className="px-6 py-3">
-                      {editingEmployee === emp.id ? (
-                        <select
-                          value={emp.department}
-                          onChange={(e) =>
-                            handleUpdateDepartment(emp.id, e.target.value)
-                          }
-                          className="border px-2 py-1 rounded"
-                        >
-                          <option value="Finance Admin">Finance Admin</option>
-                          <option value="Finance Employee">
-                            Finance Employee
-                          </option>
-                          <option value="Audit">Audit</option>
-                          <option value="Student Purchase">
-                            Student Purchase
-                          </option>
-                          <option value="User">User</option>
-                        </select>
-                      ) : (
-                        emp.department
-                      )}
-                    </td>
-                    <td className="px-6 py-3 space-x-2">
-                      {editingEmployee === emp.id ? (
-                        <button
-                          onClick={() => setEditingEmployee(null)}
-                          className="px-3 py-1 bg-gray-200 rounded"
-                        >
-                          Cancel
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setEditingEmployee(emp.id)}
-                          className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                        >
-                          Edit
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDeleteEmployee(emp.id)}
-                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-                      >
-                        Delete
-                      </button>
-                    </td>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold">Manage Employees</h2>
+              <button
+                onClick={() => handlePasswordAction("add")}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <IconPlus size={20} />
+                Add Employee
+              </button>
+            </div>
+
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Username
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Department
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {employees.map((emp) => (
+                    <tr key={emp.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {emp.username}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {emp.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {emp.email || "N/A"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {editingEmployee === emp.id ? (
+                          <select
+                            value={emp.department}
+                            onChange={(e) => 
+                              handleUpdateEmployee(emp.id, { 
+                                department: e.target.value,
+                                employee_type: e.target.value 
+                              })
+                            }
+                            className="border px-3 py-1 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="Finance Admin">Finance Admin</option>
+                            <option value="Finance Employee">Finance Employee</option>
+                            <option value="Audit">Audit</option>
+                            <option value="Student Purchase">Student Purchase</option>
+                            <option value="User">User</option>
+                          </select>
+                        ) : (
+                          <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded">
+                            {emp.department}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        {editingEmployee === emp.id ? (
+                          <button
+                            onClick={() => setEditingEmployee(null)}
+                            className="text-gray-600 hover:text-gray-900"
+                          >
+                            Cancel
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handlePasswordAction("edit", emp.id)}
+                              className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                            >
+                              <IconEdit size={16} />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handlePasswordAction("delete", emp.id)}
+                              className="text-red-600 hover:text-red-900 flex items-center gap-1 ml-2"
+                            >
+                              <IconTrash size={16} />
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
-      {/* JSON Modal */}
+      {/* Password Modal */}
       <AnimatePresence>
-        {jsonView && (
+        {showPasswordModal && (
           <motion.div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white p-6 rounded-lg shadow-lg max-w-2xl w-full relative"
-              initial={{ scale: 0.8 }}
+              className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full mx-4"
+              initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
-              exit={{ scale: 0.8 }}
+              exit={{ scale: 0.9 }}
             >
-              <pre className="whitespace-pre-wrap text-sm max-h-[500px] overflow-y-auto">
-                {jsonView}
-              </pre>
-              <button
-                onClick={() => setJsonView(null)}
-                className="absolute top-2 right-2 p-2 bg-gray-200 rounded-full hover:bg-gray-300"
-              >
-                <IconX className="h-5 w-5 text-gray-700" />
-              </button>
+              <div className="flex items-center gap-3 mb-4">
+                <IconLock className="text-red-600" />
+                <h3 className="text-lg font-semibold">Enter Finance Admin Password</h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                This action requires Finance Admin authorization.
+              </p>
+              <input
+                type="password"
+                value={enteredPassword}
+                onChange={(e) => setEnteredPassword(e.target.value)}
+                placeholder="Enter password"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 mb-4"
+                onKeyPress={(e) => e.key === "Enter" && executePasswordProtectedAction()}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={executePasswordProtectedAction}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setEnteredPassword("");
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Employee Modal */}
+      <AnimatePresence>
+        {showAddEmployeeForm && (
+          <motion.div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4"
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+            >
+              <h3 className="text-lg font-semibold mb-4">Add New Employee</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Username *</label>
+                  <input
+                    type="text"
+                    value={newEmployee.username}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, username: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter username"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    value={newEmployee.name}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter full name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={newEmployee.email}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter email address"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Department</label>
+                  <select
+                    value={newEmployee.department}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, department: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="User">User</option>
+                    <option value="Finance Admin">Finance Admin</option>
+                    <option value="Finance Employee">Finance Employee</option>
+                    <option value="Audit">Audit</option>
+                    <option value="Student Purchase">Student Purchase</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={handleAddEmployee}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Add Employee
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddEmployeeForm(false);
+                    setNewEmployee({
+                      username: "",
+                      name: "",
+                      email: "",
+                      department: "User",
+                    });
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bill Detail Modal */}
+      <AnimatePresence>
+        {showDetailModal && selectedBillDetails && (
+          <motion.div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+            >
+              <div className="flex justify-between items-center p-6 border-b">
+                <h3 className="text-xl font-semibold">Bill Details</h3>
+                <button
+                  onClick={() => {
+                    setShowDetailModal(false);
+                    setSelectedBillDetails(null);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                >
+                  <IconX size={20} />
+                </button>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                {(() => {
+                  const details = formatBillDetails(selectedBillDetails);
+                  return (
+                    <>
+                      {/* Basic Info */}
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h4 className="font-semibold mb-3">Basic Information</h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div><span className="font-medium">Bill ID:</span> {details.basicInfo.id}</div>
+                          <div><span className="font-medium">Employee ID:</span> {details.basicInfo.employeeId}</div>
+                          <div><span className="font-medium">Employee Name:</span> {details.basicInfo.employeeName}</div>
+                          <div><span className="font-medium">Submitted:</span> {details.basicInfo.submittedAt}</div>
+                        </div>
+                      </div>
+
+                      {/* Purchase Details */}
+                      <div className="bg-blue-50 rounded-lg p-4">
+                        <h4 className="font-semibold mb-3">Purchase Details</h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div><span className="font-medium">PO Details:</span> {details.purchaseDetails.poDetails}</div>
+                          <div><span className="font-medium">Supplier:</span> {details.purchaseDetails.supplierName}</div>
+                          <div><span className="font-medium">Category:</span> {details.purchaseDetails.itemCategory}</div>
+                          <div><span className="font-medium">Quantity:</span> {details.purchaseDetails.quantity}</div>
+                          <div className="col-span-2"><span className="font-medium">Description:</span> {details.purchaseDetails.itemDescription}</div>
+                          <div><span className="font-medium">Total Value:</span> ₹{details.purchaseDetails.totalValue.toLocaleString()}</div>
+                        </div>
+                      </div>
+
+                      {/* Workflow Status */}
+                      <div className="bg-green-50 rounded-lg p-4">
+                        <h4 className="font-semibold mb-3">Workflow Status</h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div><span className="font-medium">Overall Status:</span> {details.workflowStatus.overall}</div>
+                          <div><span className="font-medium">SNP Status:</span> {details.workflowStatus.snpStatus}</div>
+                          <div><span className="font-medium">Audit Status:</span> {details.workflowStatus.auditStatus}</div>
+                          <div><span className="font-medium">Finance Admin:</span> {details.workflowStatus.financeAdminStatus}</div>
+                        </div>
+                      </div>
+
+                      {/* Department Remarks */}
+                      <div className="bg-yellow-50 rounded-lg p-4">
+                        <h4 className="font-semibold mb-3">Department Remarks</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="bg-white p-2 rounded">
+                            <span className="font-medium">SNP:</span> {details.departmentRemarks.snp}
+                          </div>
+                          <div className="bg-white p-2 rounded">
+                            <span className="font-medium">Audit:</span> {details.departmentRemarks.audit}
+                          </div>
+                          <div className="bg-white p-2 rounded">
+                            <span className="font-medium">Finance Admin:</span> {details.departmentRemarks.financeAdmin}
+                          </div>
+                          {details.departmentRemarks.other !== "No remark" && (
+                            <div className="bg-white p-2 rounded">
+                              <span className="font-medium">Other:</span> {details.departmentRemarks.other}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
             </motion.div>
           </motion.div>
         )}

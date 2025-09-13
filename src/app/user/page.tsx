@@ -11,6 +11,12 @@ import {
   IconEye,
   IconX,
   IconArrowLeft,
+  IconCheck,
+  IconClock,
+  IconExclamationMark,
+  IconBan,
+  IconFileText,
+  IconAlertCircle,
 } from "@tabler/icons-react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
@@ -23,13 +29,15 @@ interface Bill {
   status: string;
   created_at?: string;
   employee_id: string;
+  employee_name: string;
   item_description?: string;
+  item_category?: string;
   qty?: number;
-  remarks?: string;
-  remarks1?: string;
-  remarks2?: string;
-  remarks3?: string;
-  remarks4?: string;
+  remarks?: string;   // Finance Admin remark
+  remarks1?: string;  // SNP remark
+  remarks2?: string;  // Audit remark
+  remarks3?: string;  // Other remark
+  remarks4?: string;  // Additional remark
   snp?: string;
   audit?: string;
   finance_admin?: string;
@@ -42,7 +50,16 @@ interface Employee {
   email?: string;
   username: string;
 }
+
 type PdaBalanceRow = { balance: number };
+
+interface BillStats {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  onHold: number;
+}
 
 export default function UserPage() {
   const { data: session } = useSession();
@@ -55,6 +72,13 @@ export default function UserPage() {
   const [loading, setLoading] = useState(true);
   const [showBalance, setShowBalance] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+  const [billStats, setBillStats] = useState<BillStats>({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    onHold: 0,
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -63,33 +87,69 @@ export default function UserPage() {
         const username = session?.user?.username;
         if (!username) return;
 
+        // Fetch employee data
         const { data: employeeData } = await supabase
           .from("employees")
           .select("*")
           .eq("username", username)
           .single();
         if (employeeData) setEmployee(employeeData);
-        
 
-const { data: balanceData, error } = await supabase
-  .from("pda_balances")
-  .select("balance")
-  .eq("employee_id", username)
-  .maybeSingle<PdaBalanceRow>();
-  
-if (error) {
-  console.error("Error fetching balance:", error.message);
-  setBalance(0);
-} else {
-  setBalance(balanceData?.balance ?? 0);
-}
+        // Fetch PDA balance
+        const { data: balanceData, error } = await supabase
+          .from("pda_balances")
+          .select("balance")
+          .eq("employee_id", username)
+          .maybeSingle<PdaBalanceRow>();
 
+        if (error) {
+          console.error("Error fetching balance:", error.message);
+          setBalance(0);
+        } else {
+          setBalance(balanceData?.balance ?? 0);
+        }
+
+        // Fetch bills
         const { data: billsData } = await supabase
           .from("bills")
           .select("*")
           .eq("employee_id", username)
           .order("created_at", { ascending: false });
-        setBills(billsData || []);
+
+        if (billsData) {
+          setBills(billsData);
+          
+          // Calculate stats
+          const stats: BillStats = {
+            total: billsData.length,
+            pending: 0,
+            approved: 0,
+            rejected: 0,
+            onHold: 0,
+          };
+
+          billsData.forEach((bill) => {
+            if (bill.status === "Accepted") {
+              stats.approved++;
+            } else if (
+              bill.audit === "Reject" ||
+              bill.finance_admin === "Reject" ||
+              bill.snp === "Reject"
+            ) {
+              stats.rejected++;
+            } else if (
+              bill.audit === "Hold" ||
+              bill.finance_admin === "Hold" ||
+              bill.snp === "Hold"
+            ) {
+              stats.onHold++;
+            } else {
+              stats.pending++;
+            }
+          });
+
+          setBillStats(stats);
+        }
       } catch (err) {
         console.error("Error loading user data:", err);
       } finally {
@@ -99,9 +159,146 @@ if (error) {
     fetchData();
   }, [session]);
 
+  const getBillStatus = (bill: Bill) => {
+    let statusLabel = "Unknown";
+    let statusType = "unknown";
+
+    if (bill.status === "Accepted") {
+      statusLabel = "Approved (All Stages)";
+      statusType = "approved";
+    } else if (
+      bill.audit === "Reject" ||
+      bill.finance_admin === "Reject" ||
+      bill.snp === "Reject"
+    ) {
+      statusLabel = "Rejected";
+      statusType = "rejected";
+      
+      // Find which department rejected
+      if (bill.snp === "Reject") statusLabel += " by SNP";
+      else if (bill.audit === "Reject") statusLabel += " by Audit";
+      else if (bill.finance_admin === "Reject") statusLabel += " by Finance Admin";
+      
+    } else if (
+      bill.audit === "Hold" ||
+      bill.finance_admin === "Hold" ||
+      bill.snp === "Hold"
+    ) {
+      statusLabel = "On Hold";
+      statusType = "hold";
+      
+      // Find which department put on hold
+      if (bill.snp === "Hold") statusLabel += " by SNP";
+      else if (bill.audit === "Hold") statusLabel += " by Audit";
+      else if (bill.finance_admin === "Hold") statusLabel += " by Finance Admin";
+      
+    } else {
+      statusType = "pending";
+      if (bill.status === "Student Purchase" && bill.snp === "Pending") {
+        statusLabel = "Pending at Student Purchase (SNP)";
+      } else if (bill.status === "Audit" && bill.audit === "Pending") {
+        statusLabel = "Pending at Audit Department";
+      } else if (bill.status === "Finance Admin" && bill.finance_admin === "Pending") {
+        statusLabel = "Pending at Finance Admin";
+      } else if (bill.status === "User") {
+        statusLabel = "Submitted - Processing Started";
+      }
+    }
+
+    return { statusLabel, statusType };
+  };
+
+  const getBillRemarks = (bill: Bill) => {
+    const remarks: { department: string; remark: string }[] = [];
+    
+    if (bill.remarks1) remarks.push({ department: "SNP", remark: bill.remarks1 });
+    if (bill.remarks2) remarks.push({ department: "Audit", remark: bill.remarks2 });
+    if (bill.remarks) remarks.push({ department: "Finance Admin", remark: bill.remarks });
+    if (bill.remarks3) remarks.push({ department: "Other", remark: bill.remarks3 });
+    if (bill.remarks4) remarks.push({ department: "Additional", remark: bill.remarks4 });
+    
+    return remarks;
+  };
+
+  const formatBillDetails = (bill: Bill) => {
+    const { statusLabel, statusType } = getBillStatus(bill);
+    const remarks = getBillRemarks(bill);
+    
+    return {
+      basicInfo: {
+        id: bill.id,
+        employeeId: bill.employee_id,
+        employeeName: bill.employee_name,
+        submittedAt: bill.created_at ? new Date(bill.created_at).toLocaleString() : "N/A",
+      },
+      purchaseDetails: {
+        poDetails: bill.po_details,
+        supplierName: bill.supplier_name,
+        itemDescription: bill.item_description,
+        itemCategory: bill.item_category,
+        quantity: bill.qty,
+        totalValue: bill.po_value,
+      },
+      currentStatus: {
+        overall: bill.status,
+        snpStatus: bill.snp || "NULL",
+        auditStatus: bill.audit || "NULL",
+        financeAdminStatus: bill.finance_admin || "NULL",
+        displayStatus: statusLabel,
+        statusType: statusType,
+      },
+      departmentRemarks: remarks,
+      workflowProgress: {
+        step1_Submission: "✅ Completed",
+        step2_SNP: bill.snp === "Approved" ? "✅ Approved" : 
+                  bill.snp === "Reject" ? "❌ Rejected" :
+                  bill.snp === "Hold" ? "⏸️ On Hold" :
+                  bill.snp === "Pending" ? "🔄 In Progress" : "⏳ Pending",
+        step3_Audit: bill.audit === "Approved" ? "✅ Approved" :
+                    bill.audit === "Reject" ? "❌ Rejected" :
+                    bill.audit === "Hold" ? "⏸️ On Hold" :
+                    bill.audit === "Pending" ? "🔄 In Progress" : "⏳ Pending",
+        step4_FinanceAdmin: bill.finance_admin === "Approved" ? "✅ Approved" :
+                           bill.finance_admin === "Reject" ? "❌ Rejected" :
+                           bill.finance_admin === "Hold" ? "⏸️ On Hold" :
+                           bill.finance_admin === "Pending" ? "🔄 In Progress" : "⏳ Pending",
+        step5_FinalApproval: bill.status === "Accepted" ? "✅ Complete" : "⏳ Pending",
+      }
+    };
+  };
+
   const links = [
-    { label: "Dashboard", href: "/user", icon: <IconWallet className="h-5 w-5 shrink-0 text-neutral-700" /> },
+    { 
+      label: "Dashboard", 
+      href: "/user", 
+      icon: <IconWallet className="h-5 w-5 shrink-0 text-neutral-700" /> 
+    },
   ];
+
+  const StatCard = ({ title, value, icon, color, description }: {
+    title: string;
+    value: number;
+    icon: React.ReactNode;
+    color: string;
+    description: string;
+  }) => (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`rounded-xl p-4 shadow-lg border-2 ${color} bg-white`}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <p className="text-2xl font-bold text-gray-900">{value}</p>
+          <p className="text-xs text-gray-500 mt-1">{description}</p>
+        </div>
+        <div className="text-3xl opacity-70">
+          {icon}
+        </div>
+      </div>
+    </motion.div>
+  );
 
   return (
     <div className="flex w-screen h-screen overflow-hidden">
@@ -117,7 +314,7 @@ if (error) {
             </div>
           </div>
 
-          {/* Logout pinned at bottom */}
+          {/* User info and logout */}
           <div className="flex flex-col gap-3">
             <SidebarLink
               link={{
@@ -146,132 +343,221 @@ if (error) {
       </Sidebar>
 
       {/* Main Dashboard */}
-      <div className="flex-1 flex flex-col bg-white overflow-y-auto p-3 md:p-6">
+      <div className="flex-1 flex flex-col bg-gray-50 overflow-y-auto p-4 md:p-6">
         {loading ? (
-          <p className="text-gray-500">Loading dashboard...</p>
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading dashboard...</p>
+            </div>
+          </div>
         ) : (
           <>
-            {/* Welcome + Balance */}
-            <div className="mb-4 md:mb-6">
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+            {/* Welcome Section */}
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
                 Welcome, {employee?.name || session?.user?.username}
               </h1>
-              <p className="text-gray-600 text-xs md:text-sm">Integrated Finance Management Portal - IIT Mandi</p>
-            </div>
+              <p className="text-gray-600 text-sm md:text-base">
+                Integrated Finance Management Portal - IIT Mandi
+              </p>
+            </motion.div>
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 mb-4">
+            {/* PDA Balance Section */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
               <button
                 onClick={() => setShowBalance(!showBalance)}
-                className="px-3 py-1.5 md:px-4 md:py-2 text-sm md:text-base rounded bg-gray-800 text-white hover:bg-gray-900"
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-md"
               >
                 {showBalance ? "Hide PDA Balance" : "Show PDA Balance"}
               </button>
-              {showBalance && (
-                <p className="text-base md:text-lg font-semibold text-green-600">
-                  PDA Balance: ₹{balance.toLocaleString()}
-                </p>
-              )}
+              <AnimatePresence>
+                {showBalance && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-3 p-4 bg-green-50 border border-green-200 rounded-lg"
+                  >
+                    <p className="text-lg md:text-xl font-bold text-green-800">
+                      Current PDA Balance: ₹{balance.toLocaleString()}
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+              <StatCard
+                title="Total Bills"
+                value={billStats.total}
+                icon={<IconFileText />}
+                color="border-blue-200"
+                description="All submitted bills"
+              />
+              <StatCard
+                title="Pending"
+                value={billStats.pending}
+                icon={<IconClock />}
+                color="border-yellow-200"
+                description="Under review"
+              />
+              <StatCard
+                title="Approved"
+                value={billStats.approved}
+                icon={<IconCheck />}
+                color="border-green-200"
+                description="Fully approved"
+              />
+              <StatCard
+                title="Rejected"
+                value={billStats.rejected}
+                icon={<IconBan />}
+                color="border-red-200"
+                description="Rejected bills"
+              />
+              <StatCard
+                title="On Hold"
+                value={billStats.onHold}
+                icon={<IconAlertCircle />}
+                color="border-orange-200"
+                description="Temporarily paused"
+              />
             </div>
 
             {/* Bills Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.4 }}
-              className="rounded-lg border border-gray-200 bg-gray-50 p-3 md:p-6 shadow-sm"
+              transition={{ delay: 0.3 }}
+              className="bg-white rounded-xl shadow-lg p-6"
             >
-              <h2 className="text-base md:text-lg font-semibold text-gray-800">
-                Recent Bill Applications
+              <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <IconReceipt2 className="text-blue-600" />
+                Your Bill Applications
               </h2>
+              
               {bills.length === 0 ? (
-                <p className="mt-3 text-gray-500">No bills submitted yet.</p>
+                <div className="text-center py-12">
+                  <IconFileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 text-lg">No bills submitted yet.</p>
+                  <p className="text-gray-400 text-sm">Your submitted bills will appear here.</p>
+                </div>
               ) : (
-                <div className="mt-3 grid grid-cols-1 gap-4">
-                  {bills.map((bill) => {
-                    let statusLabel = "Unknown";
-                    let borderClasses = "border-gray-700";
-                    let titleClasses = "text-black";
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {bills.map((bill, index) => {
+                    const { statusLabel, statusType } = getBillStatus(bill);
+                    const remarks = getBillRemarks(bill);
 
-                    if (bill.status === "Accepted") {
-                      statusLabel = "Approved (All Stages)";
-                      borderClasses = "border-4 border-green-600";
-                      titleClasses = "text-green-600 font-bold";
-                    } else if (
-                      bill.audit === "Reject" ||
-                      bill.finance_admin === "Reject" ||
-                      bill.snp === "Reject"
-                    ) {
-                      statusLabel = "Rejected";
-                      borderClasses = "border-4 border-red-600";
-                      titleClasses = "text-red-600 font-bold";
-                    } else if (
-                      bill.audit === "Hold" ||
-                      bill.finance_admin === "Hold" ||
-                      bill.snp === "Hold"
-                    ) {
-                      statusLabel = "On Hold";
-                      borderClasses = "border-4 border-yellow-500";
-                      titleClasses = "text-yellow-600 font-bold";
-                    } else {
-                      if (bill.status === "Audit") statusLabel = "Pending at Audit";
-                      else if (bill.status === "Finance Admin")
-                        statusLabel = "Pending at Finance Admin";
-                      else if (bill.status === "Student Purchase")
-                        statusLabel = "Pending at Student Purchase";
+                    const cardColors = {
+                      approved: "border-green-500 bg-green-50",
+                      rejected: "border-red-500 bg-red-50",
+                      hold: "border-orange-500 bg-orange-50",
+                      pending: "border-blue-500 bg-blue-50",
+                      unknown: "border-gray-500 bg-gray-50",
+                    };
 
-                      borderClasses = "border border-gray-700";
-                      titleClasses = "text-black font-bold";
-                    }
-
-                    const remarksDisplay: string[] = [];
-                    if (bill.remarks) remarksDisplay.push(`Remark by User: ${bill.remarks}`);
-                    if (bill.remarks1) remarksDisplay.push(`Remark by SnP: ${bill.remarks1}`);
-                    if (bill.remarks2) remarksDisplay.push(`Remark by Audit: ${bill.remarks2}`);
-                    if (bill.remarks3) remarksDisplay.push(`Remark by Finance Admin: ${bill.remarks3}`);
-                    if (bill.remarks4) remarksDisplay.push(`Remark by Other: ${bill.remarks4}`);
+                    const statusIcons = {
+                      approved: <IconCheck className="text-green-600" />,
+                      rejected: <IconBan className="text-red-600" />,
+                      hold: <IconAlertCircle className="text-orange-600" />,
+                      pending: <IconClock className="text-blue-600" />,
+                      unknown: <IconExclamationMark className="text-gray-600" />,
+                    };
 
                     return (
                       <motion.div
                         key={bill.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className={`rounded-xl p-3 md:p-4 ${borderClasses}`}
+                        transition={{ delay: index * 0.1 }}
+                        className={`rounded-xl p-5 border-2 shadow-md hover:shadow-lg transition-all duration-300 ${
+                          cardColors[statusType as keyof typeof cardColors]
+                        }`}
                       >
-                        <h3 className={`text-sm md:text-md ${titleClasses}`}>
-                          {bill.item_description || "No description"}
-                        </h3>
-                        <p className="mt-1 text-xs md:text-sm text-gray-600">
-                          Qty: {bill.qty || 0} | Amount: ₹{bill.po_value || 0}
-                        </p>
-                        <hr className="my-1.5 md:my-2 border-gray-200" />
-                        <p className="text-xs md:text-sm font-semibold text-gray-800">
-                          Status: {statusLabel}
-                        </p>
-
-                        <div className="mt-1.5 md:mt-2">
-                          {remarksDisplay.length > 0 ? (
-                            remarksDisplay.map((r, idx) => (
-                              <p key={idx} className="text-xs md:text-sm font-bold text-gray-700 mt-0.5 md:mt-1">
-                                {r}
-                              </p>
-                            ))
-                          ) : (
-                            <p className="text-xs md:text-sm font-bold text-gray-500">
-                              Remark: No remark added yet
+                        {/* Header */}
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold text-gray-800 line-clamp-2">
+                              {bill.item_description || "No description available"}
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                              PO: {bill.po_details || "N/A"} | Supplier: {bill.supplier_name || "N/A"}
                             </p>
-                          )}
+                          </div>
+                          <div className="ml-3">
+                            {statusIcons[statusType as keyof typeof statusIcons]}
+                          </div>
                         </div>
 
-                        <div className="flex justify-end mt-2 md:mt-3">
+                        {/* Details */}
+                        <div className="space-y-2 mb-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Amount:</span>
+                            <span className="font-semibold">₹{bill.po_value?.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Quantity:</span>
+                            <span className="font-semibold">{bill.qty || 0}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Category:</span>
+                            <span className="font-semibold">{bill.item_category || "N/A"}</span>
+                          </div>
+                        </div>
+
+                        {/* Status */}
+                        <div className="mb-4">
+                          <p className="text-sm font-medium text-gray-700 mb-1">Current Status:</p>
+                          <p className={`text-sm font-bold ${
+                            statusType === "approved" ? "text-green-700" :
+                            statusType === "rejected" ? "text-red-700" :
+                            statusType === "hold" ? "text-orange-700" :
+                            statusType === "pending" ? "text-blue-700" : "text-gray-700"
+                          }`}>
+                            {statusLabel}
+                          </p>
+                        </div>
+
+                        {/* Remarks */}
+                        {remarks.length > 0 && (
+                          <div className="mb-4">
+                            <p className="text-sm font-medium text-gray-700 mb-2">Department Remarks:</p>
+                            <div className="space-y-1">
+                              {remarks.map((remark, idx) => (
+                                <div key={idx} className="text-xs bg-white bg-opacity-50 rounded p-2 border">
+                                  <span className="font-semibold text-gray-800">{remark.department}:</span>
+                                  <span className="text-gray-700 ml-2">{remark.remark}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Submission Date */}
+                        <div className="mb-4">
+                          <p className="text-xs text-gray-500">
+                            Submitted: {bill.created_at ? new Date(bill.created_at).toLocaleDateString() : "N/A"}
+                          </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex justify-end">
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedBill(bill);
-                            }}
-                            className="flex items-center gap-1 text-xs md:text-sm px-2 md:px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"
+                            onClick={() => setSelectedBill(bill)}
+                            className="flex items-center gap-2 px-4 py-2 bg-white bg-opacity-80 hover:bg-opacity-100 text-gray-700 hover:text-gray-900 rounded-lg border border-gray-300 hover:border-gray-400 transition-all text-sm font-medium"
                           >
-                            <IconEye size={14} className="md:w-4 md:h-4" /> View Details
+                            <IconEye size={16} />
+                            View Details
                           </button>
                         </div>
                       </motion.div>
@@ -284,34 +570,136 @@ if (error) {
         )}
       </div>
 
-      {/* Expand Details Modal */}
+      {/* Detailed Bill Modal */}
       <AnimatePresence>
         {selectedBill && (
           <motion.div
-            className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-2 md:p-0"
+            className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white p-3 md:p-6 rounded-lg shadow-lg w-full max-w-3xl overflow-y-auto max-h-[90vh]"
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
+              className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
             >
-              <div className="flex justify-between items-center mb-3 md:mb-4">
-                <h2 className="text-lg md:text-xl font-bold">Bill Details</h2>
+              {/* Modal Header */}
+              <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gray-50">
+                <h2 className="text-xl font-bold text-gray-900">Bill Details</h2>
                 <button
                   onClick={() => setSelectedBill(null)}
-                  className="text-gray-600 hover:text-black p-1"
+                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
                   aria-label="Close"
                 >
-                  <IconX size={18} className="md:w-5 md:h-5" />
+                  <IconX size={20} />
                 </button>
               </div>
-              <pre className="text-xs md:text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto">
-                {JSON.stringify(selectedBill, null, 2)}
-              </pre>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
+                <div className="space-y-6">
+                  {(() => {
+                    const details = formatBillDetails(selectedBill);
+                    return (
+                      <>
+                        {/* Basic Information */}
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <h3 className="text-lg font-semibold mb-3 text-gray-800">Basic Information</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div><span className="font-medium">Bill ID:</span> {details.basicInfo.id}</div>
+                            <div><span className="font-medium">Employee:</span> {details.basicInfo.employeeName}</div>
+                            <div><span className="font-medium">Employee ID:</span> {details.basicInfo.employeeId}</div>
+                            <div><span className="font-medium">Submitted:</span> {details.basicInfo.submittedAt}</div>
+                          </div>
+                        </div>
+
+                        {/* Purchase Details */}
+                        <div className="bg-blue-50 rounded-lg p-4">
+                          <h3 className="text-lg font-semibold mb-3 text-gray-800">Purchase Details</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div><span className="font-medium">PO Details:</span> {details.purchaseDetails.poDetails || "N/A"}</div>
+                            <div><span className="font-medium">Supplier:</span> {details.purchaseDetails.supplierName || "N/A"}</div>
+                            <div><span className="font-medium">Category:</span> {details.purchaseDetails.itemCategory || "N/A"}</div>
+                            <div><span className="font-medium">Quantity:</span> {details.purchaseDetails.quantity || 0}</div>
+                            <div><span className="font-medium">Total Value:</span> ₹{details.purchaseDetails.totalValue?.toLocaleString() || "0"}</div>
+                            <div className="md:col-span-2">
+                              <span className="font-medium">Description:</span> {details.purchaseDetails.itemDescription || "N/A"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Workflow Progress */}
+                        <div className="bg-green-50 rounded-lg p-4">
+                          <h3 className="text-lg font-semibold mb-3 text-gray-800">Workflow Progress</h3>
+                          <div className="space-y-2 text-sm">
+                            {Object.entries(details.workflowProgress).map(([step, status]) => (
+                              <div key={step} className="flex justify-between items-center py-1">
+                                <span className="font-medium">{step.replace(/_/g, ' ').replace(/step\d+/i, '').trim()}:</span>
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  status.includes('✅') ? 'bg-green-100 text-green-800' :
+                                  status.includes('❌') ? 'bg-red-100 text-red-800' :
+                                  status.includes('⏸️') ? 'bg-orange-100 text-orange-800' :
+                                  status.includes('🔄') ? 'bg-blue-100 text-blue-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {status}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Department Remarks */}
+                        {details.departmentRemarks.length > 0 && (
+                          <div className="bg-yellow-50 rounded-lg p-4">
+                            <h3 className="text-lg font-semibold mb-3 text-gray-800">Department Remarks</h3>
+                            <div className="space-y-3">
+                              {details.departmentRemarks.map((remark, idx) => (
+                                <div key={idx} className="bg-white rounded-lg p-3 border-l-4 border-yellow-400">
+                                  <div className="font-semibold text-gray-800 mb-1">
+                                    Remark by {remark.department}:
+                                  </div>
+                                  <div className="text-gray-700 text-sm">
+                                    {remark.remark}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Current Status */}
+                        <div className={`rounded-lg p-4 ${
+                          details.currentStatus.statusType === "approved" ? "bg-green-50" :
+                          details.currentStatus.statusType === "rejected" ? "bg-red-50" :
+                          details.currentStatus.statusType === "hold" ? "bg-orange-50" :
+                          "bg-blue-50"
+                        }`}>
+                          <h3 className="text-lg font-semibold mb-3 text-gray-800">Current Status</h3>
+                          <div className="space-y-2 text-sm">
+                            <div><span className="font-medium">Overall Status:</span> {details.currentStatus.overall}</div>
+                            <div><span className="font-medium">SNP Status:</span> {details.currentStatus.snpStatus}</div>
+                            <div><span className="font-medium">Audit Status:</span> {details.currentStatus.auditStatus}</div>
+                            <div><span className="font-medium">Finance Admin Status:</span> {details.currentStatus.financeAdminStatus}</div>
+                            <div className="pt-2">
+                              <span className={`inline-block px-3 py-2 rounded-lg font-bold text-sm ${
+                                details.currentStatus.statusType === "approved" ? "bg-green-200 text-green-800" :
+                                details.currentStatus.statusType === "rejected" ? "bg-red-200 text-red-800" :
+                                details.currentStatus.statusType === "hold" ? "bg-orange-200 text-orange-800" :
+                                "bg-blue-200 text-blue-800"
+                              }`}>
+                                {details.currentStatus.displayStatus}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}
