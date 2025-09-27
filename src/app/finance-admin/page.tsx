@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../utils/supabase/client";
 import { signOut, useSession } from "next-auth/react";
+import { sendBillRemarkNotification } from "../../helpers/emailService";
 import {
   IconArrowLeft,
   IconUsers,
@@ -166,19 +167,28 @@ export default function FinanceAdminDashboard() {
   /* ---------- Bill Actions ---------- */
   const handleApprove = async (bill: Bill) => {
     try {
-      const { error } = await supabase
+      const remarkText = remarks[bill.id] || bill.remarks || "Approved by Finance Admin";
+      const remarkWithUser = `${remarkText} (By: ${session?.user?.name || 'Finance Admin'} at ${new Date().toLocaleString()})`;
+      
+      const { error } = await (supabase as any)
         .from("bills")
-        .update({ status: "Accepted", finance_admin: "Approved" })
+        .update({ 
+          status: "Accepted", 
+          finance_admin: "Approved",
+          remarks: remarkWithUser
+        })
         .eq("id", bill.id);
       if (error) throw error;
 
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id
-            ? { ...b, status: "Accepted", finance_admin: "Approved" }
+            ? { ...b, status: "Accepted", finance_admin: "Approved", remarks: remarkWithUser }
             : b
         )
       );
+
+      // No email notification for Approve
       alert("Bill approved successfully!");
     } catch (err) {
       console.error("Error approving bill:", err);
@@ -192,20 +202,34 @@ export default function FinanceAdminDashboard() {
       return;
     }
     try {
-      const { error } = await supabase
+      const remarkWithUser = `${remarks[bill.id]} (By: ${session?.user?.name || 'Finance Admin'} at ${new Date().toLocaleString()})`;
+      const { error } = await (supabase as any)
         .from("bills")
-        .update({ finance_admin: "Hold", remarks: remarks[bill.id] })
+        .update({ 
+          finance_admin: "Hold", 
+          remarks: remarkWithUser 
+        })
         .eq("id", bill.id);
       if (error) throw error;
 
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id
-            ? { ...b, finance_admin: "Hold", remarks: remarks[bill.id] }
+            ? { ...b, finance_admin: "Hold", remarks: remarkWithUser }
             : b
         )
       );
-      alert("Bill put on hold!");
+
+      // Send email notification
+      await sendBillRemarkNotification({
+        billId: bill.id,
+        department: 'Finance Admin',
+        remark: remarks[bill.id],
+        action: 'Hold',
+        timestamp: new Date().toLocaleString()
+      });
+
+      alert("Bill put on hold! Email notification sent to employee.");
     } catch (err) {
       console.error("Error holding bill:", err);
       alert("Error holding bill");
@@ -218,20 +242,34 @@ export default function FinanceAdminDashboard() {
       return;
     }
     try {
-      const { error } = await supabase
+      const remarkWithUser = `${remarks[bill.id]} (By: ${session?.user?.name || 'Finance Admin'} at ${new Date().toLocaleString()})`;
+      const { error } = await (supabase as any)
         .from("bills")
-        .update({ finance_admin: "Reject", remarks: remarks[bill.id] })
+        .update({ 
+          finance_admin: "Reject", 
+          remarks: remarkWithUser 
+        })
         .eq("id", bill.id);
       if (error) throw error;
 
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id
-            ? { ...b, finance_admin: "Reject", remarks: remarks[bill.id] }
+            ? { ...b, finance_admin: "Reject", remarks: remarkWithUser }
             : b
         )
       );
-      alert("Bill rejected!");
+
+      // Send email notification
+      await sendBillRemarkNotification({
+        billId: bill.id,
+        department: 'Finance Admin',
+        remark: remarks[bill.id],
+        action: 'Reject',
+        timestamp: new Date().toLocaleString()
+      });
+
+      alert("Bill rejected! Email notification sent to employee.");
     } catch (err) {
       console.error("Error rejecting bill:", err);
       alert("Error rejecting bill");
@@ -254,9 +292,15 @@ export default function FinanceAdminDashboard() {
 
   const handleUpdateEmployee = async (id: string, updates: Partial<Employee>) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("employees")
-        .update(updates)
+        .update({
+          username: updates.username,
+          name: updates.name,
+          email: updates.email,
+          department: updates.department,
+          employee_type: updates.employee_type
+        })
         .eq("id", id);
       if (error) throw error;
 
@@ -278,15 +322,15 @@ export default function FinanceAdminDashboard() {
         return;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("employees")
-        .insert([{
+        .insert({
           username: newEmployee.username,
           name: newEmployee.name,
           email: newEmployee.email,
           department: newEmployee.department,
           employee_type: newEmployee.department,
-        }])
+        })
         .select();
 
       if (error) throw error;
@@ -337,7 +381,6 @@ export default function FinanceAdminDashboard() {
       icon: <IconUsers className="h-5 w-5 shrink-0 text-green-600" />,
       onClick: () => setActivePage("employees"),
     },
-
   ];
 
   const formatBillDetails = (bill: Bill) => {
@@ -380,32 +423,28 @@ export default function FinanceAdminDashboard() {
           <div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
             {open ? <Logo /> : <LogoIcon />}
             <div className="mt-8 flex flex-col gap-2">
-              {links.map((link, idx) =>
-                link.href ? (
-                  <SidebarLink key={idx} link={link} />
-                ) : (
-                  <button
-                    key={idx}
-                    onClick={link.onClick}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded text-left w-full transition-colors",
-                      activePage === link.label.toLowerCase().replace(" ", "-") 
-                        ? "bg-blue-100 font-medium text-blue-900" 
-                        : "hover:bg-gray-100"
-                    )}
-                  >
-                    <div className="min-w-[24px] flex justify-center">
-                      {link.icon}
-                    </div>
-                    <span className={cn(
-                      "transition-all duration-200", 
-                      open ? "opacity-100" : "opacity-0 md:hidden"
-                    )}>
-                      {link.label}
-                    </span>
-                  </button>
-                )
-              )}
+              {links.map((link, idx) => (
+                <button
+                  key={idx}
+                  onClick={link.onClick}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded text-left w-full transition-colors",
+                    activePage === link.label.toLowerCase().replace(" ", "-") 
+                      ? "bg-blue-100 font-medium text-blue-900" 
+                      : "hover:bg-gray-100"
+                  )}
+                >
+                  <div className="min-w-[24px] flex justify-center">
+                    {link.icon}
+                  </div>
+                  <span className={cn(
+                    "transition-all duration-200", 
+                    open ? "opacity-100" : "opacity-0 md:hidden"
+                  )}>
+                    {link.label}
+                  </span>
+                </button>
+              ))}
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-left w-full mt-4"

@@ -1,5 +1,5 @@
 "use client";
-
+import { sendBillRemarkNotification } from "@/helpers/emailService";
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../utils/supabase/client";
@@ -162,7 +162,7 @@ export default function AuditDashboard() {
   // approve handler - moves to Finance Admin
   const handleApprove = async (bill: Bill) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("bills")
         .update({
           status: "Finance Admin",
@@ -188,7 +188,7 @@ export default function AuditDashboard() {
     }
   };
 
-  // reject handler - sets Audit status to Reject with remark
+  // reject handler - sets Audit status to Reject with remark and sends email
   const handleReject = async (bill: Bill) => {
     if (!remarks[bill.id] || remarks[bill.id].trim() === "") {
       alert("Please provide a remark before rejecting.");
@@ -196,11 +196,12 @@ export default function AuditDashboard() {
     }
 
     try {
-      const { error } = await supabase
+      const remarkWithUser = `${remarks[bill.id]} (By: ${session?.user?.name || 'Audit'} at ${new Date().toLocaleString()})`;
+      const { error } = await (supabase as any)
         .from("bills")
         .update({
           audit: "Reject",
-          remarks2: remarks[bill.id], // Audit department uses remarks2
+          remarks2: remarkWithUser, // Audit department uses remarks2
         })
         .eq("id", bill.id);
 
@@ -209,19 +210,32 @@ export default function AuditDashboard() {
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id 
-            ? { ...b, audit: "Reject", remarks2: remarks[bill.id] } 
+            ? { ...b, audit: "Reject", remarks2: remarkWithUser } 
             : b
         )
       );
 
-      alert("Bill rejected!");
+      // Log before sending email
+      console.log('Audit email notification called for bill:', bill.id);
+      // Send email notification
+      if (typeof sendBillRemarkNotification === 'function') {
+        await sendBillRemarkNotification({
+          billId: bill.id,
+          department: 'Audit',
+          remark: remarks[bill.id],
+          action: 'Reject',
+          timestamp: new Date().toLocaleString()
+        });
+      }
+
+      alert("Bill rejected! Email notification sent to employee.");
     } catch (err) {
       console.error("Error rejecting bill:", err);
       alert("Error rejecting bill");
     }
   };
 
-  // hold handler - sets Audit status to Hold with remark
+  // hold handler - sets Audit status to Hold with remark and sends email
   const handleHold = async (bill: Bill) => {
     if (!remarks[bill.id] || remarks[bill.id].trim() === "") {
       alert("Please enter a remark before putting the bill on Hold.");
@@ -229,11 +243,12 @@ export default function AuditDashboard() {
     }
 
     try {
-      const { error } = await supabase
+      const remarkWithUser = `${remarks[bill.id]} (By: ${session?.user?.name || 'Audit'} at ${new Date().toLocaleString()})`;
+      const { error } = await (supabase as any)
         .from("bills")
         .update({
           audit: "Hold",
-          remarks2: remarks[bill.id], // Audit department uses remarks2
+          remarks2: remarkWithUser, // Audit department uses remarks2
         })
         .eq("id", bill.id);
 
@@ -242,12 +257,25 @@ export default function AuditDashboard() {
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id 
-            ? { ...b, audit: "Hold", remarks2: remarks[bill.id] } 
+            ? { ...b, audit: "Hold", remarks2: remarkWithUser } 
             : b
         )
       );
 
-      alert("Bill put on hold!");
+      // Log before sending email
+      console.log('Audit email notification called for bill:', bill.id);
+      // Send email notification
+      if (typeof sendBillRemarkNotification === 'function') {
+        await sendBillRemarkNotification({
+          billId: bill.id,
+          department: 'Audit',
+          remark: remarks[bill.id],
+          action: 'Hold',
+          timestamp: new Date().toLocaleString()
+        });
+      }
+
+      alert("Bill put on hold! Email notification sent to employee.");
     } catch (err) {
       console.error("Error holding bill:", err);
       alert("Error holding bill");

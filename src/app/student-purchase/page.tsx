@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { sendBillRemarkNotification } from "@/helpers/emailService";
 import { motion } from "framer-motion";
 import { supabase } from "../utils/supabase/client";
 import { signOut, useSession } from "next-auth/react";
@@ -70,7 +71,7 @@ export default function SnpDashboard() {
   // approve handler
   const handleApprove = async (bill: Bill) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("bills")
         .update({
           status: "Audit",
@@ -95,12 +96,17 @@ export default function SnpDashboard() {
 
   // reject handler
   const handleReject = async (bill: Bill) => {
+    if (!remarks[bill.id] || remarks[bill.id].trim() === "") {
+      alert("Please enter a remark before rejecting the bill.");
+      return;
+    }
     try {
-      const { error } = await supabase
+      const remarkWithUser = `${remarks[bill.id]} (By: ${session?.user?.name || 'Student Purchase'} at ${new Date().toLocaleString()})`;
+      const { error } = await (supabase as any)
         .from("bills")
         .update({
           snp: "Reject",
-          remarks: remarks[bill.id] || null,
+          remarks: remarkWithUser,
         })
         .eq("id", bill.id);
 
@@ -108,9 +114,20 @@ export default function SnpDashboard() {
 
       setBills((prev) =>
         prev.map((b) =>
-          b.id === bill.id ? { ...b, snp: "Reject" } : b
+          b.id === bill.id ? { ...b, snp: "Reject", remarks: remarkWithUser } : b
         )
       );
+
+      // Send email notification for Reject
+      await sendBillRemarkNotification({
+        billId: bill.id,
+        department: "Student Purchase",
+        remark: remarks[bill.id],
+        action: "Reject",
+        timestamp: new Date().toLocaleString(),
+      });
+
+      alert(`Bill rejected! Email notification sent to employee.`);
     } catch (err) {
       console.error("Error rejecting bill:", err);
     }
@@ -124,11 +141,12 @@ export default function SnpDashboard() {
     }
 
     try {
-      const { error } = await supabase
+      const remarkWithUser = `${remarks[bill.id]} (By: ${session?.user?.name || 'Student Purchase'} at ${new Date().toLocaleString()})`;
+      const { error } = await (supabase as any)
         .from("bills")
         .update({
           snp: "Hold",
-          remarks: remarks[bill.id],
+          remarks: remarkWithUser,
         })
         .eq("id", bill.id);
 
@@ -136,9 +154,20 @@ export default function SnpDashboard() {
 
       setBills((prev) =>
         prev.map((b) =>
-          b.id === bill.id ? { ...b, snp: "Hold", remarks: remarks[bill.id] } : b
+          b.id === bill.id ? { ...b, snp: "Hold", remarks: remarkWithUser } : b
         )
       );
+
+      // Send email notification for Hold
+      await sendBillRemarkNotification({
+        billId: bill.id,
+        department: "Student Purchase",
+        remark: remarks[bill.id],
+        action: "Hold",
+        timestamp: new Date().toLocaleString(),
+      });
+
+      alert(`Bill put on hold! Email notification sent to employee.`);
     } catch (err) {
       console.error("Error holding bill:", err);
     }

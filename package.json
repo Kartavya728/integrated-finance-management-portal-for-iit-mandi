@@ -17,6 +17,7 @@
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.57.2",
     "@tabler/icons-react": "^3.34.1",
+    "@types/nodemailer": "^7.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "ldapjs": "^3.0.7",
@@ -24,6 +25,7 @@
     "motion": "^12.23.12",
     "next": "15.5.2",
     "next-auth": "^4.24.11",
+    "nodemailer": "^6.10.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "tailwind-merge": "^3.3.1"
