@@ -86,7 +86,7 @@ export const employeesService = {
     return await supabase
       .from('employees')
       .select('*')
-      .eq('employee_type', employeeType)
+      .eq('department', employeeType)
       .order('created_at', { ascending: false })
   },
 
@@ -139,55 +139,26 @@ export const employeesService = {
   async getEmployeeStats(): Promise<{
     data: {
       totalEmployees: number
-      financeAdminCount: number
-      financeEmployeeCount: number
-      auditCount: number
-      studentPurchaseCount: number
+      byDepartment: Record<string, number>
     } | null
     error: any
   }> {
     try {
       const { data: employees, error } = await supabase
         .from('employees')
-        .select('employee_type')
+        .select('department')
 
       if (error) return { data: null, error }
 
       const stats = employees?.reduce(
-        (acc, employee) => {
+        (acc: { totalEmployees: number; byDepartment: Record<string, number> }, employee: any) => {
           acc.totalEmployees++
-
-          switch (employee.employee_type) {
-            case 'Finance Admin':
-              acc.financeAdminCount++
-              break
-            case 'Finance Employee':
-              acc.financeEmployeeCount++
-              break
-            case 'Audit':
-              acc.auditCount++
-              break
-            case 'Student Purchase':
-              acc.studentPurchaseCount++
-              break
-          }
-
+          const dep = employee.department || 'Unknown'
+          acc.byDepartment[dep] = (acc.byDepartment[dep] || 0) + 1
           return acc
         },
-        {
-          totalEmployees: 0,
-          financeAdminCount: 0,
-          financeEmployeeCount: 0,
-          auditCount: 0,
-          studentPurchaseCount: 0,
-        }
-      ) || {
-        totalEmployees: 0,
-        financeAdminCount: 0,
-        financeEmployeeCount: 0,
-        auditCount: 0,
-        studentPurchaseCount: 0,
-      }
+        { totalEmployees: 0, byDepartment: {} }
+      ) || { totalEmployees: 0, byDepartment: {} }
 
       return { data: stats, error: null }
     } catch (error) {

@@ -1,5 +1,6 @@
 // BillsHistory.tsx
 import React, { useState } from "react";
+import { supabase } from "../utils/supabase/client";
 import { Bill } from "./types";
 import EditBillModal from "./EditBillModal";
 
@@ -7,18 +8,41 @@ interface BillsHistoryProps {
   bills: Bill[];
   loading: boolean;
   onBillUpdated: () => void;
+  alwaysEditable?: boolean; // if true, show Edit for all rows
+  allowDelete?: boolean;    // if true, show Delete for each row
 }
 
 const BillsHistory: React.FC<BillsHistoryProps> = ({ 
   bills, 
   loading, 
-  onBillUpdated 
+  onBillUpdated,
+  alwaysEditable = false,
+  allowDelete = false,
 }) => {
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const canEditBill = (bill: Bill) => {
-    // Can only edit if status is "Hold" (not "Pending")
+    if (alwaysEditable) return true;
+    // Otherwise only when on hold in any dept
     return bill.snp === "Hold" || bill.audit === "Hold";
+  };
+
+  const handleDelete = async (billId: string) => {
+    if (!allowDelete) return;
+    const confirmed = window.confirm("Are you sure you want to delete this bill?");
+    if (!confirmed) return;
+    try {
+      setDeletingId(billId);
+      const { error } = await supabase.from("bills").delete().eq("id", billId);
+      if (error) throw error;
+      onBillUpdated();
+    } catch (err) {
+      console.error("Error deleting bill:", err);
+      alert("Error deleting bill");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -143,7 +167,7 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
                   {new Date(bill.created_at).toLocaleDateString()}
                 </td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
+                <td className="px-3 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                   {canEditBill(bill) ? (
                     <button
                       onClick={() => setEditingBill(bill)}
@@ -155,6 +179,15 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
                     <span className="text-gray-400 px-3 py-1">
                       {bill.snp === "Pending" || bill.audit === "Pending" ? "Pending" : "Locked"}
                     </span>
+                  )}
+                  {allowDelete && (
+                    <button
+                      onClick={() => handleDelete(bill.id)}
+                      disabled={deletingId === bill.id}
+                      className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors disabled:opacity-50"
+                    >
+                      {deletingId === bill.id ? "Deleting..." : "Delete"}
+                    </button>
                   )}
                 </td>
               </tr>

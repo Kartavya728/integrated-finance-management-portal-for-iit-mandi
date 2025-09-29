@@ -104,6 +104,18 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
       audit = "Pending";
     }
 
+    // Lookup employee department
+    const { data: empData, error: empErr } = await supabase
+      .from('employees')
+      .select('department')
+      .eq('id', formData.employee_id)
+      .single();
+
+    if (empErr) {
+      alert('Could not find employee department.');
+      return;
+    }
+
     // Normalize optional numeric fields
     const normalizedData: any = {
       ...formData,
@@ -115,6 +127,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
       audit,
       status: "User",
       finance_admin: null,
+      employee_department: empData?.department || null,
     };
 
     // Normalize empty strings to null for optional text fields

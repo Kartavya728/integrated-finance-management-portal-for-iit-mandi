@@ -23,6 +23,87 @@ import {
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
+// Allowed departments
+const DEPARTMENTS = [
+  "Staff Recruitment Section",
+  "Dean Infrastructure (I&S)/Land Acquisition",
+  "Dean Resource Generation & Alumni Relations",
+  "Central Dak Section",
+  "Health Center",
+  "School of Computing & Electrical Engineering",
+  "School of Chemical Sciences",
+  "School of Physical Sciences",
+  "School of Mathematical & Statistical Sciences",
+  "School of Biosciences & Bio Engineering",
+  "School of Mechanical & Materials Engineering",
+  "School of Civil & Environmental Engineering",
+  "School of Humanities & Social Sciences",
+  "School of Management",
+  "Advanced Materials Research Center (AMRC)",
+  "Centre of Artificial Intelligence and Robotics (CAIR)",
+  "Center for Quantum Science and Technologies (CQST)",
+  "Centre for Design & Fabrication of Electronic Devices (C4DFED)",
+  "Center for Human-Computer Interaction (CHCI)",
+  "Center for Climate Change and Disaster Management (C3DAR)",
+  "IIT Mandi i-Hub & HCI",
+  "IKSMHA Center",
+  "Centre for Continuing Education (CCE)",
+  "JEE CELL",
+  "JAM",
+  "GATE",
+  "Office of Chief Warden",
+  "Parashar Hostel",
+  "Chandertaal Hostel",
+  "Suvalsar Hostel",
+  "Nako Hostel",
+  "Dashir Hostel",
+  "Beas Kund Hostel",
+  "Manimahesh Hostel",
+  "Suraj Taal Hostel",
+  "Gauri Kund Hostel",
+  "Central Mess",
+  "Sports",
+  "NSS",
+  "Guidance & Counselling Cell",
+  "Construction & Maintainance Cell",
+  "Transportation",
+  "Guest House",
+  "Housekeeping Services & Waste Management",
+  "Creche",
+  "Security Unit",
+  "Common Rooms",
+  "Career & Placement Cell",
+  "IIT Mandi Catalyst",
+  "Recreation Center",
+  "CPWD",
+  "Banks",
+  "IPDC",
+  "IR",
+  "Mind Tree School",
+  "Renuka Hostel",
+  "Rewalsar",
+  "Director Office",
+  "Deans",
+  "Associate Deans",
+  "Registrar Office",
+  "Administration and Establishment Section",
+  "Faculty Establishment and Recruitment",
+  "Finance and Accounts",
+  "Store and Purchase Section",
+  "Rajbhasa Section",
+  "Ranking Cell (RC)",
+  "Media Cell",
+  "Academics Section",
+  "Academic Affairs",
+  "Research Affairs",
+  "Legal Section",
+  "Internal Audit",
+  "Central Library",
+  "DIGITAL AND COMPUTING SERVICES",
+  "Dean (SRIC & IR ) Office",
+  "Dean (Students) Office",
+];
+
 /* ---------- Interfaces ---------- */
 interface Bill {
   id: string;
@@ -85,7 +166,7 @@ export default function FinanceAdminDashboard() {
     username: "",
     name: "",
     email: "",
-    department: "User",
+    department: "School of Computing & Electrical Engineering",
   });
 
   const FINANCE_ADMIN_PASSWORD = "admin123"; // In production, this should be in environment variables
@@ -299,7 +380,6 @@ export default function FinanceAdminDashboard() {
           name: updates.name,
           email: updates.email,
           department: updates.department,
-          employee_type: updates.employee_type
         })
         .eq("id", id);
       if (error) throw error;
@@ -329,7 +409,6 @@ export default function FinanceAdminDashboard() {
           name: newEmployee.name,
           email: newEmployee.email,
           department: newEmployee.department,
-          employee_type: newEmployee.department,
         })
         .select();
 
@@ -341,7 +420,7 @@ export default function FinanceAdminDashboard() {
           username: "",
           name: "",
           email: "",
-          department: "User",
+          department: "School of Computing & Electrical Engineering",
         });
         setShowAddEmployeeForm(false);
         alert("Employee added successfully!");
@@ -884,16 +963,13 @@ export default function FinanceAdminDashboard() {
                             onChange={(e) => 
                               handleUpdateEmployee(emp.id, { 
                                 department: e.target.value,
-                                employee_type: e.target.value 
                               })
                             }
                             className="border px-3 py-1 rounded-lg focus:ring-2 focus:ring-blue-500"
                           >
-                            <option value="Finance Admin">Finance Admin</option>
-                            <option value="Finance Employee">Finance Employee</option>
-                            <option value="Audit">Audit</option>
-                            <option value="Student Purchase">Student Purchase</option>
-                            <option value="User">User</option>
+                            {DEPARTMENTS.map((d) => (
+                              <option key={d} value={d}>{d}</option>
+                            ))}
                           </select>
                         ) : (
                           <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded">
@@ -1047,11 +1123,9 @@ export default function FinanceAdminDashboard() {
                     onChange={(e) => setNewEmployee({ ...newEmployee, department: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="User">User</option>
-                    <option value="Finance Admin">Finance Admin</option>
-                    <option value="Finance Employee">Finance Employee</option>
-                    <option value="Audit">Audit</option>
-                    <option value="Student Purchase">Student Purchase</option>
+                    {DEPARTMENTS.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -1070,7 +1144,7 @@ export default function FinanceAdminDashboard() {
                       username: "",
                       name: "",
                       email: "",
-                      department: "User",
+                      department: "School of Computing & Electrical Engineering",
                     });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"

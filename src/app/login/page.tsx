@@ -35,9 +35,12 @@ export default function LoginPage() {
           const routeMap: Record<string, string> = {
             "Finance Admin": "/finance-admin",
             "Finance Employee": "/finance-employee",
-            'Bill Employee':"/apply-bill",
             "Audit": "/audit",
             "Student Purchase": "/student-purchase",
+            
+            "bill_employee_fill": "/apply-bill",
+            "bill_employee_edit": "/bill-editor",
+            
           };
 
           const redirectUrl = employeeType && routeMap[employeeType] ? routeMap[employeeType] : "/user";
