@@ -41,16 +41,53 @@ const EditBillModal: React.FC<EditBillModalProps> = ({
   useEffect(() => {
     const fetchBalance = async () => {
       try {
-        const { data, error } = await supabase
+        const normalizedId = (bill.employee_id || "").toString().trim().toUpperCase();
+        // 1) Exact match → get first row
+        let { data, error } = await supabase
           .from("pda_balances")
-          .select("balance")
-          .eq("employee_id", bill.employee_id)
-          .single();
-        if (error) {
+          .select("employee_id,balance")
+          .eq("employee_id", normalizedId)
+          .order("updated_at", { ascending: false })
+          .limit(1);
+
+        let balanceValue: number | null = null;
+        if (!error && Array.isArray(data) && data.length > 0) {
+          balanceValue = Number((data as any)[0]?.balance ?? null);
+        }
+
+        // 2) Case-insensitive fallback
+        if ((error || balanceValue === null)) {
+          const res = await supabase
+            .from("pda_balances")
+            .select("employee_id,balance")
+            .ilike("employee_id", normalizedId)
+            .order("updated_at", { ascending: false })
+            .limit(1);
+          if (!res.error && Array.isArray(res.data) && res.data.length > 0) {
+            balanceValue = Number((res.data as any)[0]?.balance ?? null);
+          }
+          error = res.error as any;
+        }
+
+        // 3) Loose contains fallback (handles stray spaces or prefixes)
+        if ((error || balanceValue === null)) {
+          const res2 = await supabase
+            .from("pda_balances")
+            .select("employee_id,balance")
+            .ilike("employee_id", `%${normalizedId}%`)
+            .order("updated_at", { ascending: false })
+            .limit(1);
+          if (!res2.error && Array.isArray(res2.data) && res2.data.length > 0) {
+            balanceValue = Number((res2.data as any)[0]?.balance ?? null);
+          }
+          error = res2.error as any;
+        }
+
+        if (error && !balanceValue) {
           console.error("Error fetching PDA balance:", error.message);
           setBalance(null);
         } else {
-          setBalance(data?.balance || 0);
+          setBalance(Number.isFinite(balanceValue as number) ? (balanceValue as number) : 0);
         }
       } catch (err) {
         console.error(err);
@@ -144,9 +181,9 @@ const EditBillModal: React.FC<EditBillModalProps> = ({
       const balanceDifference = newBillValue - originalBillValue;
       if (balanceDifference !== 0 && balance !== null) {
         const newBalance = balance - balanceDifference;
-        const { error: updateErr } = await supabase
+        const { error: updateErr } = await (supabase as any)
           .from("pda_balances")
-          .update({ balance: newBalance, updated_at: new Date() })
+          .update({ balance: Number(newBalance), updated_at: new Date().toISOString() })
           .eq("employee_id", bill.employee_id);
 
         if (updateErr) {
@@ -158,7 +195,7 @@ const EditBillModal: React.FC<EditBillModalProps> = ({
       }
 
       // Update the bill
-      const { error: updateBillErr } = await supabase
+      const { error: updateBillErr } = await (supabase as any)
         .from("bills")
         .update(normalizedData)
         .eq("id", bill.id);

@@ -28,22 +28,49 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
     location: "",
   });
 
+  // Helpers for sanitization
+  const normalizeText = (val: string) => val.replace(/\s+/g, " ").trim();
+  const normalizeEmployeeId = (val: string) => normalizeText(val).toUpperCase();
+
+  // Robust PDA balance lookup (handles case/whitespace)
+  const fetchPdaBalanceById = async (rawId: string) => {
+    const id = normalizeEmployeeId(rawId);
+    // 1) exact match
+    let { data, error } = await supabase
+      .from("pda_balances")
+      .select("employee_id,balance")
+      .eq("employee_id", id)
+      .maybeSingle();
+    if (data && !error) return data.balance as number | null;
+
+    // 2) case-insensitive match
+    const res2 = await supabase
+      .from("pda_balances")
+      .select("employee_id,balance")
+      .ilike("employee_id", id)
+      .maybeSingle();
+    if (res2.data && !res2.error) return res2.data.balance as number | null;
+
+    // 3) loose match (contains); then pick the exact trimmed match if exists
+    const res3 = await supabase
+      .from("pda_balances")
+      .select("employee_id,balance")
+      .ilike("employee_id", `%${id}%`)
+      .limit(5);
+    if (res3.data && res3.data.length > 0) {
+      const exact = res3.data.find((r: any) => normalizeEmployeeId(r.employee_id) === id);
+      return (exact?.balance ?? res3.data[0]?.balance) as number | null;
+    }
+    return null;
+  };
+
   // Fetch PDA balance when employee_id changes
   useEffect(() => {
     const fetchBalance = async () => {
       if (!formData.employee_id) return;
       try {
-        const { data, error } = await supabase
-          .from("pda_balances")
-          .select("balance")
-          .eq("employee_id", formData.employee_id)
-          .single();
-        if (error) {
-          console.error("Error fetching PDA balance:", error.message);
-          setBalance(null);
-        } else {
-          setBalance(data?.balance || 0);
-        }
+        const bal = await fetchPdaBalanceById(formData.employee_id);
+        if (bal == null) setBalance(null); else setBalance(Number(bal));
       } catch (err) {
         console.error(err);
         setBalance(null);
@@ -55,7 +82,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const billValue = parseFloat(formData.po_value);
+    const billValue = parseFloat(String(formData.po_value).replace(/,/g, ""));
 
     // Required fields
     if (!formData.employee_id || !formData.employee_name) {
@@ -68,47 +95,60 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
       return;
     }
 
-    // Check PDA balance
-    const { data: balanceData, error: balanceErr } = await supabase
-      .from("pda_balances")
-      .select("balance")
-      .eq("employee_id", formData.employee_id)
-      .single();
+    // Normalize identifiers
+    const normalizedEmployeeId = normalizeEmployeeId(formData.employee_id);
+    const normalizedEmployeeName = normalizeText(formData.employee_name);
 
-    if (balanceErr || !balanceData) {
+    // Check PDA balance
+    const foundBalance = await fetchPdaBalanceById(normalizedEmployeeId);
+    if (foundBalance == null) {
       alert("Invalid Employee ID or no PDA balance found.");
       return;
     }
 
-    const currentBalance = parseFloat(balanceData.balance);
+    const currentBalance = parseFloat(String(foundBalance));
     if (currentBalance < billValue) {
       alert("Insufficient PDA balance. Cannot submit bill.");
       return;
     }
 
-    // Determine category, snp, audit
+    // Determine initial workflow per new rules
+    // Major/Minor: send to SNP first.
+    //   - If amount <= 50k, after SNP approval -> Finance Admin
+    //   - If amount > 50k, after SNP approval -> Audit (then Finance Admin)
+    // Consumables: do not send to SNP.
+    //   - If amount <= 50k -> Finance Admin directly
+    //   - If amount > 50k -> Audit (then Finance Admin)
     let category = formData.item_category;
     let snp: "Pending" | "Reject" | "Hold" | "Approved" | null = null;
     let audit: "Pending" | "Reject" | "Hold" | "Approved" | null = null;
+    let status: string = "User";
 
-    if (billValue > 50000) {
-      if (category === "Minor") {
-        alert("Bills greater than ₹50,000 cannot be Minor.");
-        return;
+    if (category === "Consumables") {
+      // Skip SNP completely
+      snp = null;
+      if (billValue <= 50000) {
+        status = "Finance Admin";
+        audit = null;
+        // Ensure it appears in Finance Admin review
+        // by marking finance_admin as Pending
+        
+      } else {
+        status = "Audit";
+        audit = "Pending";
       }
+    } else {
+      // Treat both Major and Minor the same for initial routing: go to SNP
       snp = "Pending";
       audit = null;
-    } else {
-      category = "Minor";
-      snp = null;
-      audit = "Pending";
+      status = "Student Purchase";
     }
 
     // Lookup employee department
     const { data: empData, error: empErr } = await supabase
       .from('employees')
       .select('department')
-      .eq('id', formData.employee_id)
+      .eq('id', normalizedEmployeeId)
       .single();
 
     if (empErr) {
@@ -119,14 +159,25 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
     // Normalize optional numeric fields
     const normalizedData: any = {
       ...formData,
+      employee_id: normalizedEmployeeId,
+      employee_name: normalizedEmployeeName,
+      po_details: normalizeText(formData.po_details || ""),
+      supplier_name: normalizeText(formData.supplier_name || ""),
+      supplier_address: normalizeText(formData.supplier_address || ""),
+      item_description: normalizeText(formData.item_description || ""),
+      bill_details: normalizeText(formData.bill_details || ""),
+      indenter_name: normalizeText(formData.indenter_name || ""),
+      source_of_fund: normalizeText(formData.source_of_fund || ""),
+      stock_entry: normalizeText(formData.stock_entry || ""),
+      location: normalizeText(formData.location || ""),
       po_value: billValue,
-      qty: formData.qty ? parseInt(formData.qty.toString()) : null,
-      qty_issued: formData.qty_issued ? parseInt(formData.qty_issued.toString()) : null,
+      qty: formData.qty ? parseInt(String(formData.qty).replace(/,/g, "")) : null,
+      qty_issued: formData.qty_issued ? parseInt(String(formData.qty_issued).replace(/,/g, "")) : null,
       item_category: category,
       snp,
       audit,
-      status: "User",
-      finance_admin: null,
+      status,
+      finance_admin: status === "Finance Admin" && billValue <= 50000 ? "Pending" : null,
       employee_department: empData?.department || null,
     };
 
@@ -154,7 +205,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
       const { error: updateErr } = await supabase
         .from("pda_balances")
         .update({ balance: currentBalance - billValue, updated_at: new Date() })
-        .eq("employee_id", formData.employee_id);
+        .ilike("employee_id", normalizedEmployeeId);
 
       if (updateErr) {
         console.error("Error updating PDA balance:", updateErr.message);
@@ -212,9 +263,16 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
             {field === "item_category" ? (
               <select
                 value={formData[field as keyof BillFormData]}
-                onChange={(e) =>
-                  setFormData({ ...formData, [field]: e.target.value })
-                }
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (field === "employee_id") {
+                    setFormData({ ...formData, [field]: normalizeEmployeeId(raw) as any });
+                  } else if (typeof raw === 'string') {
+                    setFormData({ ...formData, [field]: raw });
+                  } else {
+                    setFormData({ ...formData, [field]: raw as any });
+                  }
+                }}
                 className="w-full border p-2 rounded"
               >
                 <option>Minor</option>

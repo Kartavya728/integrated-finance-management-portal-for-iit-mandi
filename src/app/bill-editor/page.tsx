@@ -27,7 +27,7 @@ export default function BillEditorPage() {
           .eq("id", userId)
           .single();
         if (empErr) throw empErr;
-        const dept = emp?.department || null;
+        const dept = (emp as { department: string | null } | null)?.department || null;
         setDepartment(dept);
 
         if (!dept) {
@@ -93,7 +93,7 @@ export default function BillEditorPage() {
       <div className="flex flex-1 p-6 overflow-y-auto bg-gray-50">
         <div className="w-full">
           <h2 className="text-2xl font-semibold mb-6">Bill Editor</h2>
-          <BillsHistory bills={bills} loading={loading} onBillUpdated={handleBillUpdated} alwaysEditable />
+          <BillsHistory bills={bills} loading={loading} onBillUpdated={handleBillUpdated} alwaysEditable allowDelete={false} />
         </div>
       </div>
     </div>

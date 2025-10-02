@@ -194,10 +194,11 @@ export default function UserPage() {
       
     } else {
       statusType = "pending";
+      // New workflow mapping: SNP only for Major/Minor; Consumables skip SNP
       if (bill.status === "Student Purchase" && bill.snp === "Pending") {
-        statusLabel = "Pending at Student Purchase (SNP)";
+        statusLabel = "Pending at SNP";
       } else if (bill.status === "Audit" && bill.audit === "Pending") {
-        statusLabel = "Pending at Audit Department";
+        statusLabel = "Pending at Audit";
       } else if (bill.status === "Finance Admin" && bill.finance_admin === "Pending") {
         statusLabel = "Pending at Finance Admin";
       } else if (bill.status === "User") {
@@ -250,18 +251,40 @@ export default function UserPage() {
       departmentRemarks: remarks,
       workflowProgress: {
         step1_Submission: "✅ Completed",
-        step2_SNP: bill.snp === "Approved" ? "✅ Approved" : 
-                  bill.snp === "Reject" ? "❌ Rejected" :
-                  bill.snp === "Hold" ? "⏸️ On Hold" :
-                  bill.snp === "Pending" ? "🔄 In Progress" : "⏳ Pending",
-        step3_Audit: bill.audit === "Approved" ? "✅ Approved" :
-                    bill.audit === "Reject" ? "❌ Rejected" :
-                    bill.audit === "Hold" ? "⏸️ On Hold" :
-                    bill.audit === "Pending" ? "🔄 In Progress" : "⏳ Pending",
-        step4_FinanceAdmin: bill.finance_admin === "Approved" ? "✅ Approved" :
-                           bill.finance_admin === "Reject" ? "❌ Rejected" :
-                           bill.finance_admin === "Hold" ? "⏸️ On Hold" :
-                           bill.finance_admin === "Pending" ? "🔄 In Progress" : "⏳ Pending",
+        step2_SNP:
+          bill.snp == null && (bill.status === "Audit" || bill.status === "Finance Admin")
+            ? "↷ Skipped"
+            : bill.snp === "Approved"
+            ? "✅ Approved"
+            : bill.snp === "Reject"
+            ? "❌ Rejected"
+            : bill.snp === "Hold"
+            ? "⏸️ On Hold"
+            : bill.snp === "Pending"
+            ? "🔄 In Progress"
+            : "⏳ Pending",
+        step3_Audit:
+          bill.audit == null && bill.status === "Finance Admin"
+            ? "↷ Skipped"
+            : bill.audit === "Approved"
+            ? "✅ Approved"
+            : bill.audit === "Reject"
+            ? "❌ Rejected"
+            : bill.audit === "Hold"
+            ? "⏸️ On Hold"
+            : bill.audit === "Pending"
+            ? "🔄 In Progress"
+            : "⏳ Pending",
+        step4_FinanceAdmin:
+          bill.finance_admin === "Approved"
+            ? "✅ Approved"
+            : bill.finance_admin === "Reject"
+            ? "❌ Rejected"
+            : bill.finance_admin === "Hold"
+            ? "⏸️ On Hold"
+            : bill.finance_admin === "Pending"
+            ? "🔄 In Progress"
+            : "⏳ Pending",
         step5_FinalApproval: bill.status === "Accepted" ? "✅ Complete" : "⏳ Pending",
       }
     };

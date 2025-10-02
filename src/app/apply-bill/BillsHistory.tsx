@@ -10,6 +10,7 @@ interface BillsHistoryProps {
   onBillUpdated: () => void;
   alwaysEditable?: boolean; // if true, show Edit for all rows
   allowDelete?: boolean;    // if true, show Delete for each row
+  enableEdit?: boolean;     // if false, hide Edit UI completely
 }
 
 const BillsHistory: React.FC<BillsHistoryProps> = ({ 
@@ -18,6 +19,7 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
   onBillUpdated,
   alwaysEditable = false,
   allowDelete = false,
+  enableEdit = true,
 }) => {
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -117,8 +119,13 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
                 Created At
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
+                Edit
               </th>
+              {allowDelete && (
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Delete
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -167,36 +174,44 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
                   {new Date(bill.created_at).toLocaleDateString()}
                 </td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                  {canEditBill(bill) ? (
-                    <button
-                      onClick={() => setEditingBill(bill)}
-                      className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-md transition-colors"
-                    >
-                      Edit
-                    </button>
-                  ) : (
-                    <span className="text-gray-400 px-3 py-1">
-                      {bill.snp === "Pending" || bill.audit === "Pending" ? "Pending" : "Locked"}
-                    </span>
-                  )}
-                  {allowDelete && (
+                {enableEdit ? (
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
+                    {canEditBill(bill) ? (
+                      <button
+                        onClick={() => setEditingBill(bill)}
+                        className="inline-flex items-center text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-md transition-colors"
+                      >
+                        Edit
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center text-gray-400 px-3 py-1">
+                        {bill.snp === "Pending" || bill.audit === "Pending" ? "Pending" : "Locked"}
+                      </span>
+                    )}
+                  </td>
+                ) : (
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
+                    <span className="text-gray-300">—</span>
+                  </td>
+                )}
+                {allowDelete && (
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
                     <button
                       onClick={() => handleDelete(bill.id)}
                       disabled={deletingId === bill.id}
-                      className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors disabled:opacity-50"
+                      className="inline-flex items-center text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors disabled:opacity-50"
                     >
                       {deletingId === bill.id ? "Deleting..." : "Delete"}
                     </button>
-                  )}
-                </td>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {editingBill && (
+      {enableEdit && editingBill && (
         <EditBillModal
           bill={editingBill}
           onClose={() => setEditingBill(null)}

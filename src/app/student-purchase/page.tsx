@@ -27,9 +27,11 @@ interface Bill {
   status: string;
   snp: string;
   audit: string;
+  finance_admin?: string;
   created_at?: string;
   employee_id: string;
   item_description?: string;
+  item_category?: string;
   qty?: number;
   remarks?: string;
 }
@@ -68,16 +70,28 @@ export default function SnpDashboard() {
     fetchBills();
   }, []);
 
-  // approve handler
+  // approve handler (new workflow)
   const handleApprove = async (bill: Bill) => {
     try {
+      // Major/Minor: SNP approves -> if <=50k go to Finance Admin, else go to Audit
+      const goToFinanceAdmin = bill.po_value <= 50000;
+
+      const updates: any = {
+        snp: "Approved",
+      };
+
+      if (goToFinanceAdmin) {
+        updates.status = "Finance Admin";
+        updates.finance_admin = "Pending";
+        updates.audit = bill.audit || null;
+      } else {
+        updates.status = "Audit";
+        updates.audit = "Pending";
+      }
+
       const { error } = await (supabase as any)
         .from("bills")
-        .update({
-          status: "Audit",
-          audit: "Pending",
-          snp: "Approved",
-        })
+        .update(updates)
         .eq("id", bill.id);
 
       if (error) throw error;
@@ -85,7 +99,7 @@ export default function SnpDashboard() {
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id
-            ? { ...b, status: "Audit", audit: "Pending", snp: "Approved" }
+            ? { ...b, ...updates }
             : b
         )
       );

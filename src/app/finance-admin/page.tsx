@@ -662,7 +662,12 @@ export default function FinanceAdminDashboard() {
             ) : (
               <div className="space-y-4">
                 {bills
-                  .filter(bill => bill.finance_admin === "Pending" || bill.finance_admin === "Hold")
+                  .filter(bill => 
+                    bill.finance_admin === "Pending" || 
+                    bill.finance_admin === "Hold" || 
+                    // Legacy/edge: show Finance Admin status rows even if finance_admin is null
+                    (bill.status === "Finance Admin" && (bill.finance_admin === null || bill.finance_admin === undefined))
+                  )
                   .map((bill) => {
                     const isExpanded = expandedBill === bill.id;
                     const locked = bill.finance_admin === "Approved" || bill.finance_admin === "Reject";
@@ -703,13 +708,17 @@ export default function FinanceAdminDashboard() {
                             >
                               <IconEye size={16} />
                             </button>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              bill.finance_admin === "Hold" 
-                                ? "bg-yellow-100 text-yellow-800" 
-                                : "bg-blue-100 text-blue-800"
-                            }`}>
-                              {bill.finance_admin}
-                            </span>
+                            {(() => {
+                              const label = bill.finance_admin ?? (bill.status === "Finance Admin" ? "Pending" : "");
+                              const cls = label === "Hold"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-blue-100 text-blue-800";
+                              return (
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${cls}`}>
+                                  {label}
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
 

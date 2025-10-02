@@ -45,6 +45,7 @@ export default function EmployeeDashboard() {
           .from("bills")
           .select("*")
           .eq("employee_department", dept)
+          .not("employee_department", "is", null)
           .order("created_at", { ascending: false });
         if (error) throw error;
         setBills(data || []);
@@ -68,6 +69,7 @@ export default function EmployeeDashboard() {
           .from("bills")
           .select("*")
           .eq("employee_department", department)
+          .not("employee_department", "is", null)
           .order("created_at", { ascending: false });
         if (error) throw error;
         setBills(data || []);
@@ -87,6 +89,7 @@ export default function EmployeeDashboard() {
           .from("bills")
           .select("*")
           .eq("employee_department", department)
+          .not("employee_department", "is", null)
           .order("created_at", { ascending: false });
         if (error) throw error;
         setBills(data || []);
@@ -134,6 +137,7 @@ export default function EmployeeDashboard() {
             loading={loading}
             onBillUpdated={handleBillUpdated}
             allowDelete
+            enableEdit={false}
           />
         )}
       </div>
