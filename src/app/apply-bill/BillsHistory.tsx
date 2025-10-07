@@ -116,10 +116,10 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
                 Audit
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Created At
+                Finance Admin
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Edit
+                Created At
               </th>
               {allowDelete && (
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -171,29 +171,18 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
                     "N/A"
                   )}
                 </td>
+                <td className="px-3 py-4 whitespace-nowrap text-sm">
+                  {bill.finance_admin ? (
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(bill.finance_admin)}`}>
+                      {bill.finance_admin}
+                    </span>
+                  ) : (
+                    "N/A"
+                  )}
+                </td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
                   {new Date(bill.created_at).toLocaleDateString()}
                 </td>
-                {enableEdit ? (
-                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
-                    {canEditBill(bill) ? (
-                      <button
-                        onClick={() => setEditingBill(bill)}
-                        className="inline-flex items-center text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-md transition-colors"
-                      >
-                        Edit
-                      </button>
-                    ) : (
-                      <span className="inline-flex items-center text-gray-400 px-3 py-1">
-                        {bill.snp === "Pending" || bill.audit === "Pending" ? "Pending" : "Locked"}
-                      </span>
-                    )}
-                  </td>
-                ) : (
-                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
-                    <span className="text-gray-300">—</span>
-                  </td>
-                )}
                 {allowDelete && (
                   <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
                     <button
