@@ -121,6 +121,11 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Created At
               </th>
+              {enableEdit && (
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Edit
+                </th>
+              )}
               {allowDelete && (
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Delete
@@ -183,6 +188,21 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
                   {new Date(bill.created_at).toLocaleDateString()}
                 </td>
+                {enableEdit && (
+                  <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
+                      onClick={() => setEditingBill(bill)}
+                      disabled={!canEditBill(bill)}
+                      className={`inline-flex items-center px-3 py-1 rounded-md transition-colors ${
+                        canEditBill(bill)
+                          ? "text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100"
+                          : "text-gray-400 bg-gray-100 cursor-not-allowed"
+                      }`}
+                    >
+                      Edit
+                    </button>
+                  </td>
+                )}
                 {allowDelete && (
                   <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
                     <button

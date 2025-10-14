@@ -91,28 +91,21 @@ export const authOptions: AuthOptions = {
 
         
 
-        if(credentials.username == "Audit" || credentials.username=="User" || credentials.username=="Finance Admin" ||credentials.username=="SNP" || credentials.username=="Bill Employee" ){
+        if(credentials.username == "Audit" || credentials.username=="User" || credentials.username=="Bill-form" || credentials.username=="Finance Admin" ||credentials.username=="SNP" || credentials.username=="Bill-edit" ){
           if(credentials.password =="123"){
-
-            const normalizedUser={
-              id:credentials.username,
-              username:credentials.username,
-              name:credentials.username,
-              email:credentials.username+"@iitmandi.ac.in",
-              ou:"staff",
-              employee_type:credentials.username,
-
-
-            }
-
-            if(credentials.username=="SNP"){
-              normalizedUser.employee_type="Student Purchase"
-            }
-            console.log('[NextAuth][authorize] returning normalized user', { normalizedUser })
-            return normalizedUser;
-
-
-
+            console.log('[NextAuth][authorize] fetching employee type for user', { uid: credentials.username});
+            const employee_type = await getEmployeeTypeByUserId(credentials.username);
+            console.log('[NextAuth][authorize] employee type resolved', { employee_type });
+              const normalizedUser={
+                id:credentials.username,
+                username:credentials.username,
+                name:credentials.username,
+                email:credentials.username+"@iitmandi.ac.in",
+                ou:"staff",
+                employee_type: employee_type || null,
+              }
+              console.log('[NextAuth][authorize] returning normalized user', { normalizedUser })
+              return normalizedUser;
           }
           else{
             throw new Error ("Invalid credentials")

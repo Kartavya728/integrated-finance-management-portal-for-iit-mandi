@@ -38,7 +38,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
     // 1) exact match
     let { data, error } = await supabase
       .from("pda_balances")
-      .select("employee_id,balance")
+      .select("employee_id,balance,department")
       .eq("employee_id", id)
       .maybeSingle();
     if (data && !error) return data.balance as number | null;
@@ -46,7 +46,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
     // 2) case-insensitive match
     const res2 = await supabase
       .from("pda_balances")
-      .select("employee_id,balance")
+      .select("employee_id,balance,department")
       .ilike("employee_id", id)
       .maybeSingle();
     if (res2.data && !res2.error) return res2.data.balance as number | null;
@@ -54,7 +54,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
     // 3) loose match (contains); then pick the exact trimmed match if exists
     const res3 = await supabase
       .from("pda_balances")
-      .select("employee_id,balance")
+      .select("employee_id,balance,department")
       .ilike("employee_id", `%${id}%`)
       .limit(5);
     if (res3.data && res3.data.length > 0) {
@@ -146,10 +146,11 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
 
     // Lookup employee department
     const { data: empData, error: empErr } = await supabase
-      .from('employees')
-      .select('department')
-      .eq('id', normalizedEmployeeId)
-      .single();
+    .from("pda_balances")
+    .select("employee_id,balance,department")
+    .eq("employee_id", normalizedEmployeeId)
+    .maybeSingle();
+    if (empData && !empErr) return empData.department as string | null;
 
     if (empErr) {
       alert('Could not find employee department.');
