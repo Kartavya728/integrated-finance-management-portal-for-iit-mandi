@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { po_details, supplier_name, po_value } = body;
 
-    // 1. Find employee by username
+    // 1️⃣ Find employee by username
     const { data: employee, error: empError } = await supabase
       .from("employees")
       .select("id")
@@ -27,22 +27,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Insert bill with employee_id = employee.id
-    const { data, error } = await supabase.from("bills").insert([
-      {
-        po_details,
-        supplier_name,
-        po_value,
-        status: "Pending",
-        employee_id: employee.id, // ✅ Correct foreign key usage
-      },
-    ]);
+    // 2️⃣ Insert bill with employee_id = employee.id
+    const { data, error } = await supabase
+      .from("bills")
+      .insert([
+        {
+          po_details,
+          supplier_name,
+          po_value,
+          status: "Pending",
+          employee_id: employee.id,
+        },
+      ])
+      .select("id")
+      .single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ message: "Bill saved successfully", data });
+    // ✅ Return the new bill ID for redirect
+    return NextResponse.json({
+      message: "Bill saved successfully",
+      id: data.id,
+    });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
