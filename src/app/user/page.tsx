@@ -1,6 +1,8 @@
 "use client";
+import QRCode from "react-qr-code";
 
 import React, { useEffect, useState } from "react";
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../utils/supabase/client";
@@ -64,6 +66,7 @@ interface BillStats {
 export default function UserPage() {
   const { data: session } = useSession();
   const router = useRouter();
+  const qrRef = useRef<HTMLDivElement | null>(null);
 
   const [open, setOpen] = useState(false);
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -208,7 +211,38 @@ export default function UserPage() {
 
     return { statusLabel, statusType };
   };
+  const printQRCode = (id: string) => {
+    const qrContainer = document.getElementById(id);
+    if (!qrContainer) return;
 
+    const svg = qrContainer.querySelector("svg") as SVGSVGElement;
+    if (!svg) return;
+
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx?.drawImage(img, 0, 0);
+      const imgData = canvas.toDataURL("image/png");
+
+      const newWindow = window.open("", "_blank");
+      if (!newWindow) return;
+      newWindow.document.write(`
+        <html>
+          <head><title>Print QR</title></head>
+          <body style="display:flex;justify-content:center;align-items:center;height:100vh;margin:0;">
+            <img src="${imgData}" />
+            <script>window.onload=()=>{window.print();window.close();}</script>
+          </body>
+        </html>
+      `);
+      newWindow.document.close();
+    };
+    img.src = "data:image/svg+xml;base64," + btoa(svgData);
+  };
   const getBillRemarks = (bill: Bill) => {
     const remarks: { department: string; remark: string }[] = [];
     
@@ -572,6 +606,25 @@ export default function UserPage() {
                             Submitted: {bill.created_at ? new Date(bill.created_at).toLocaleDateString() : "N/A"}
                           </p>
                         </div>
+                        {/* QR Code */}
+                        {getBillStatus(bill).statusType === "approved" && (
+                          <div className="mb-2 flex flex-col items-center">
+                            <div id={`qr-${bill.id}`}>
+                              <QRCode
+                                value={`${window.location.origin}/user/bill/${bill.id}`}
+                                size={128}
+                              />
+                            </div>
+                            <button
+                              onClick={() => printQRCode(bill.id)}
+                              className="mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                            >
+                              Print QR
+                            </button>
+                          </div>
+                        )}
+
+
 
                         {/* Actions */}
                         <div className="flex justify-end">
@@ -718,6 +771,26 @@ export default function UserPage() {
                             </div>
                           </div>
                         </div>
+                        {/* QR Code for Bill */}
+                        {details.currentStatus.statusType === "approved" && (
+                          <div className="bg-white rounded-lg p-4 mt-4 flex flex-col items-center border">
+                            <h3 className="text-lg font-semibold mb-3 text-gray-800">QR Code for this Bill</h3>
+                            <div id={`qr-modal-${details.basicInfo.id}`} className="mb-2">
+                              <QRCode
+                                value={`${window.location.origin}/user/bill/${details.basicInfo.id}`}
+                                size={180}
+                              />
+                            </div>
+                            <button
+                              onClick={() => printQRCode(`modal-${details.basicInfo.id}`)}
+                              className="mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                            >
+                              Print QR
+                            </button>
+                          </div>
+                        )}
+
+
                       </>
                     );
                   })()}

@@ -220,7 +220,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
       try { onBillSubmitted(); } catch (e) { /* ignore */ }
 
       // 3) Redirect to QR page for the new bill
-      router.push(`/bill/${newBillId}`);
+      router.push(`../user/bill/${newBillId}`);
     } catch (err: any) {
       console.error("Unexpected error during bill submission:", err);
       alert("Something went wrong. Please try again.");
