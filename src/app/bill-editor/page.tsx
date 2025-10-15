@@ -71,6 +71,12 @@ export default function BillEditorPage() {
     fetchBills();
   };
 
+  // Below: bills are fetched and set with setBills(data || [])
+  // Add a filter for 'Hold' status before rendering
+  const billsOnHold = bills.filter(
+    b => b.snp === 'Hold' || b.audit === 'Hold' || b.finance_admin === 'Hold'
+  );
+
   return (
     <div className="flex h-screen w-full bg-white overflow-hidden">
       <Sidebar open={open} setOpen={setOpen}>
@@ -93,7 +99,7 @@ export default function BillEditorPage() {
       <div className="flex flex-1 p-6 overflow-y-auto bg-gray-50">
         <div className="w-full">
           <h2 className="text-2xl font-semibold mb-6">Bill Editor</h2>
-          <BillsHistory bills={bills} loading={loading} onBillUpdated={handleBillUpdated} alwaysEditable allowDelete={false} />
+          <BillsHistory bills={billsOnHold} loading={loading} onBillUpdated={handleBillUpdated} alwaysEditable allowDelete={false} />
         </div>
       </div>
     </div>

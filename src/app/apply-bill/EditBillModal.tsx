@@ -103,6 +103,19 @@ const EditBillModal: React.FC<EditBillModalProps> = ({
 
     const newBillValue = parseFloat(formData.po_value);
 
+    // ENFORCE 50k THRESHOLD SIDE on amount edit
+    const wasAbove50k = originalBillValue > 50000;
+    const isAbove50k = newBillValue > 50000;
+    if (wasAbove50k !== isAbove50k) {
+      alert(
+        originalBillValue <= 50000
+          ? "New amount must remain ≤ 50,000 since the original was ≤ 50,000."
+          : "New amount must remain > 50,000 since the original was > 50,000."
+      );
+      setLoading(false);
+      return;
+    }
+
     // Validation
     if (!formData.employee_id || !formData.employee_name) {
       alert("Employee ID and Name are required.");
@@ -126,35 +139,28 @@ const EditBillModal: React.FC<EditBillModalProps> = ({
       }
     }
 
-    // Determine category, snp, audit based on new value
-    let category = formData.item_category;
-    let snp: "Pending" | "Reject" | "Hold" | "Approved" | null = null;
-    let audit: "Pending" | "Reject" | "Hold" | "Approved" | null = null;
+    // Prepare workflow stage update
+    let snp = bill.snp;
+    let audit = bill.audit;
+    let finance_admin = bill.finance_admin;
 
-    if (newBillValue > 50000) {
-      if (category === "Minor") {
-        alert("Bills greater than ₹50,000 cannot be Minor.");
-        setLoading(false);
-        return;
-      }
-      snp = "Pending";
-      audit = null;
-    } else {
-      category = "Minor";
-      snp = null;
-      audit = "Pending";
+    if (bill.snp === 'Hold') {
+      snp = 'Pending';
+    } else if (bill.audit === 'Hold') {
+      audit = 'Pending';
+    } else if (bill.finance_admin === 'Hold') {
+      finance_admin = 'Pending';
     }
 
-    // Normalize the data
+    // Normalize fields; only update hold-to-pending status
     const normalizedData: any = {
       ...formData,
       po_value: newBillValue,
       qty: formData.qty ? parseInt(formData.qty.toString()) : null,
       qty_issued: formData.qty_issued ? parseInt(formData.qty_issued.toString()) : null,
-      item_category: category,
       snp,
       audit,
-      status: "User", // Reset status back to User when edited
+      finance_admin,
     };
 
     // Normalize empty strings to null
@@ -250,18 +256,9 @@ const EditBillModal: React.FC<EditBillModalProps> = ({
                   )}
                 </label>
                 {field === "item_category" ? (
-                  <select
-                    value={formData[field as keyof BillFormData]}
-                    onChange={(e) =>
-                      setFormData({ ...formData, [field]: e.target.value })
-                    }
-                    className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    disabled={loading}
-                  >
-                    <option>Minor</option>
-                    <option>Major</option>
-                    <option>Consumables</option>
-                  </select>
+                  <div className="w-full p-2 rounded border border-gray-200 bg-gray-50 text-gray-800 select-none cursor-not-allowed">
+                    {formData[field as keyof BillFormData]}
+                  </div>
                 ) : (
                   <input
                     type={
