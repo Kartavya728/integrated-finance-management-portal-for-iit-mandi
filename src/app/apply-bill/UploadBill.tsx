@@ -1,14 +1,19 @@
 // UploadBill.tsx
+"use client";
+
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "../utils/supabase/client";
 import { BillFormData } from "./types";
+import { useRouter } from "next/navigation";
 
 interface UploadBillProps {
   onBillSubmitted: () => void;
 }
 
 const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
+  const router = useRouter();
+
   const [balance, setBalance] = useState<number | null>(null);
   const [formData, setFormData] = useState<BillFormData>({
     employee_id: "",
@@ -28,7 +33,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
     location: "",
   });
 
-  // Helpers for sanitization
+  // ---------- Helpers ----------
   const normalizeText = (val: string) => val.replace(/\s+/g, " ").trim();
   const normalizeEmployeeId = (val: string) => normalizeText(val).toUpperCase();
 
@@ -67,35 +72,37 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
   // Fetch PDA balance when employee_id changes
   useEffect(() => {
     const fetchBalance = async () => {
-      if (!formData.employee_id) return;
+      if (!formData.employee_id) {
+        setBalance(null);
+        return;
+      }
       try {
         const bal = await fetchPdaBalanceById(formData.employee_id);
-        if (bal == null) setBalance(null); else setBalance(Number(bal));
+        setBalance(bal != null ? Number(bal) : null);
       } catch (err) {
-        console.error(err);
+        console.error("Error fetching PDA balance:", err);
         setBalance(null);
       }
     };
     fetchBalance();
   }, [formData.employee_id]);
 
+  // ---------- Submit handler ----------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const billValue = parseFloat(String(formData.po_value).replace(/,/g, ""));
 
-    // Required fields
+    // Basic validation
     if (!formData.employee_id || !formData.employee_name) {
       alert("Employee ID and Name are required.");
       return;
     }
-
     if (isNaN(billValue) || billValue <= 0) {
       alert("Enter a valid bill amount.");
       return;
     }
 
-    // Normalize identifiers
     const normalizedEmployeeId = normalizeEmployeeId(formData.employee_id);
     const normalizedEmployeeName = normalizeText(formData.employee_name);
 
@@ -106,58 +113,39 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
       return;
     }
 
-    const currentBalance = parseFloat(String(foundBalance));
-    if (currentBalance < billValue) {
+    if (foundBalance < billValue) {
       alert("Insufficient PDA balance. Cannot submit bill.");
       return;
     }
 
-    // Determine initial workflow per new rules
-    // Major/Minor: send to SNP first.
-    //   - If amount <= 50k, after SNP approval -> Finance Admin
-    //   - If amount > 50k, after SNP approval -> Audit (then Finance Admin)
-    // Consumables: do not send to SNP.
-    //   - If amount <= 50k -> Finance Admin directly
-    //   - If amount > 50k -> Audit (then Finance Admin)
-    let category = formData.item_category;
-    let snp: "Pending" | "Reject" | "Hold" | "Approved" | null = null;
-    let audit: "Pending" | "Reject" | "Hold" | "Approved" | null = null;
-    let status: string = "User";
-
-    if (category === "Consumables") {
-      // Skip SNP completely
-      snp = null;
-      if (billValue <= 50000) {
-        status = "Finance Admin";
-        audit = null;
-        // Ensure it appears in Finance Admin review
-        // by marking finance_admin as Pending
-        
-      } else {
-        status = "Audit";
-        audit = "Pending";
-      }
-    } else {
-      // Treat both Major and Minor the same for initial routing: go to SNP
-      snp = "Pending";
-      audit = null;
-      status = "Student Purchase";
-    }
-
-    // Lookup employee department
+    // Lookup employee department (use same matching approach)
     const { data: empData, error: empErr } = await supabase
-    .from("pda_balances")
-    .select("employee_id,balance,department")
-    .eq("employee_id", normalizedEmployeeId)
-    .maybeSingle();
-    if (empData && !empErr) return empData.department as string | null;
+      .from("pda_balances")
+      .select("department")
+      .ilike("employee_id", normalizedEmployeeId)
+      .maybeSingle();
 
-    if (empErr) {
-      alert('Could not find employee department.');
+    if (empErr || !empData) {
+      alert("Could not find employee department.");
       return;
     }
 
-    // Normalize optional numeric fields
+    // Determine workflow flags
+    const category = formData.item_category;
+    let snp: "Pending" | null = null;
+    let audit: "Pending" | null = null;
+    let status: string = "User";
+
+    if (category === "Consumables") {
+      snp = null;
+      status = billValue <= 50000 ? "Finance Admin" : "Audit";
+      if (status === "Audit") audit = "Pending";
+    } else {
+      snp = "Pending";
+      status = "Student Purchase";
+    }
+
+    // Prepare normalized payload for DB
     const normalizedData: any = {
       ...formData,
       employee_id: normalizedEmployeeId,
@@ -173,13 +161,15 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
       location: normalizeText(formData.location || ""),
       po_value: billValue,
       qty: formData.qty ? parseInt(String(formData.qty).replace(/,/g, "")) : null,
-      qty_issued: formData.qty_issued ? parseInt(String(formData.qty_issued).replace(/,/g, "")) : null,
+      qty_issued: formData.qty_issued
+        ? parseInt(String(formData.qty_issued).replace(/,/g, ""))
+        : null,
       item_category: category,
       snp,
       audit,
       status,
       finance_admin: status === "Finance Admin" && billValue <= 50000 ? "Pending" : null,
-      employee_department: empData?.department || null,
+      employee_department: empData.department || null,
     };
 
     // Normalize empty strings to null for optional text fields
@@ -194,18 +184,15 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
       "stock_entry",
       "location",
     ];
-
     optionalFields.forEach((field) => {
-      if (!normalizedData[field] || normalizedData[field] === "") {
-        normalizedData[field] = null;
-      }
+      if (!normalizedData[field] || normalizedData[field] === "") normalizedData[field] = null;
     });
 
     try {
-      // Deduct PDA balance
+      // 1) Deduct PDA balance (case-insensitive)
       const { error: updateErr } = await supabase
         .from("pda_balances")
-        .update({ balance: currentBalance - billValue, updated_at: new Date() })
+        .update({ balance: foundBalance - billValue, updated_at: new Date() })
         .ilike("employee_id", normalizedEmployeeId);
 
       if (updateErr) {
@@ -214,44 +201,37 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
         return;
       }
 
-      // Insert bill
-      const { error: insertErr } = await supabase.from("bills").insert([normalizedData]);
+      // 2) Insert bill and request the inserted id
+      const { data: insertedBill, error: insertErr } = await supabase
+        .from("bills")
+        .insert([normalizedData])
+        .select("id")
+        .single();
 
-      if (insertErr) {
-        console.error("Failed to upload bill:", insertErr.message);
-        alert(`Failed to upload bill: ${insertErr.message}`);
+      if (insertErr || !insertedBill) {
+        console.error("Failed to insert bill:", insertErr?.message || insertErr);
+        alert("Failed to upload bill: " + (insertErr?.message ?? "Unknown error"));
         return;
       }
 
-      alert("Bill submitted successfully!");
-      setFormData({
-        employee_id: "",
-        employee_name: "",
-        po_details: "",
-        po_value: "",
-        supplier_name: "",
-        supplier_address: "",
-        item_category: "Minor",
-        item_description: "",
-        qty: "",
-        bill_details: "",
-        indenter_name: "",
-        qty_issued: "",
-        source_of_fund: "",
-        stock_entry: "",
-        location: "",
-      });
-      setBalance(null);
-      onBillSubmitted();
+      const newBillId = insertedBill.id;
+
+      // Optional: notify parent component that a bill was submitted
+      try { onBillSubmitted(); } catch (e) { /* ignore */ }
+
+      // 3) Redirect to QR page for the new bill
+      router.push(`../user/bill/${newBillId}`);
     } catch (err: any) {
-      console.error("Unexpected error:", err.message || err);
+      console.error("Unexpected error during bill submission:", err);
       alert("Something went wrong. Please try again.");
     }
   };
 
+  // ---------- Render form ----------
   return (
     <div className="w-full max-w-3xl mx-auto">
       <h1 className="text-2xl font-semibold mb-6">Upload New Bill</h1>
+
       <form
         onSubmit={handleSubmit}
         className="grid grid-cols-2 gap-4 bg-white shadow p-6 rounded-lg border"
@@ -261,19 +241,11 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
             <label className="block text-gray-700 capitalize">
               {field.replace(/_/g, " ")}
             </label>
+
             {field === "item_category" ? (
               <select
                 value={formData[field as keyof BillFormData]}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (field === "employee_id") {
-                    setFormData({ ...formData, [field]: normalizeEmployeeId(raw) as any });
-                  } else if (typeof raw === 'string') {
-                    setFormData({ ...formData, [field]: raw });
-                  } else {
-                    setFormData({ ...formData, [field]: raw as any });
-                  }
-                }}
+                onChange={(e) => setFormData({ ...formData, [field]: e.target.value as any })}
                 className="w-full border p-2 rounded"
               >
                 <option>Minor</option>
@@ -282,23 +254,16 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
               </select>
             ) : (
               <input
-                type={
-                  field.includes("qty") || field.includes("value")
-                    ? "number"
-                    : "text"
-                }
+                type={field.includes("qty") || field.includes("value") ? "number" : "text"}
                 value={formData[field as keyof BillFormData]}
-                onChange={(e) =>
-                  setFormData({ ...formData, [field]: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
                 className="w-full border p-2 rounded"
-                required={
-                  field === "employee_id" || field === "employee_name"
-                }
+                required={field === "employee_id" || field === "employee_name"}
               />
             )}
           </div>
         ))}
+
         <div className="col-span-2">
           <motion.button
             type="submit"
@@ -308,6 +273,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted }) => {
             Submit Bill
           </motion.button>
         </div>
+
         {balance !== null && (
           <div className="col-span-2 text-gray-600">
             Current PDA Balance: ₹ {balance.toFixed(2)}
