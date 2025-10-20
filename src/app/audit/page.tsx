@@ -218,17 +218,21 @@ export default function AuditDashboard() {
       // Log before sending email
       console.log('Audit email notification called for bill:', bill.id);
       // Send email notification
-      if (typeof sendBillRemarkNotification === 'function') {
-        await sendBillRemarkNotification({
-          billId: bill.id,
-          department: 'Audit',
-          remark: remarks[bill.id],
-          action: 'Reject',
-          timestamp: new Date().toLocaleString()
-        });
+      try {
+        if (typeof sendBillRemarkNotification === 'function') {
+          await sendBillRemarkNotification({
+            billId: bill.id,
+            department: 'Audit',
+            remark: remarks[bill.id],
+            action: 'Reject',
+            timestamp: new Date().toLocaleString()
+          });
+        }
+        alert("Bill rejected! Email notification sent to employee.");
+      } catch (emailError) {
+        console.error("Email notification failed:", emailError);
+        alert("Bill rejected! However, email notification failed to send.");
       }
-
-      alert("Bill rejected! Email notification sent to employee.");
     } catch (err) {
       console.error("Error rejecting bill:", err);
       alert("Error rejecting bill");
@@ -265,17 +269,21 @@ export default function AuditDashboard() {
       // Log before sending email
       console.log('Audit email notification called for bill:', bill.id);
       // Send email notification
-      if (typeof sendBillRemarkNotification === 'function') {
-        await sendBillRemarkNotification({
-          billId: bill.id,
-          department: 'Audit',
-          remark: remarks[bill.id],
-          action: 'Hold',
-          timestamp: new Date().toLocaleString()
-        });
+      try {
+        if (typeof sendBillRemarkNotification === 'function') {
+          await sendBillRemarkNotification({
+            billId: bill.id,
+            department: 'Audit',
+            remark: remarks[bill.id],
+            action: 'Hold',
+            timestamp: new Date().toLocaleString()
+          });
+        }
+        alert("Bill put on hold! Email notification sent to employee.");
+      } catch (emailError) {
+        console.error("Email notification failed:", emailError);
+        alert("Bill put on hold! However, email notification failed to send.");
       }
-
-      alert("Bill put on hold! Email notification sent to employee.");
     } catch (err) {
       console.error("Error holding bill:", err);
       alert("Error holding bill");
@@ -323,9 +331,8 @@ export default function AuditDashboard() {
       departmentRemarks: {
         snp: bill.remarks1 || "No remark from SNP",
         audit: bill.remarks2 || "No remark yet",
-        financeAdmin: bill.remarks || "Not reached Finance Admin yet",
-        additional1: bill.remarks3 || "No additional remark",
-        additional2: bill.remarks4 || "No additional remark",
+        financeAdmin: bill.remarks3 || "Not reached Finance Admin yet",
+        other: bill.remarks4 || "No additional remark",
       }
     };
   };
@@ -928,16 +935,24 @@ export default function AuditDashboard() {
                               <div className="text-gray-700 mt-1">{details.departmentRemarks.snp}</div>
                             </div>
                           )}
-                          
-                          <div className="bg-white p-3 rounded border-l-4 border-green-500">
-                            <div className="font-medium text-green-800">Audit Department (Your Remark):</div>
-                            <div className="text-gray-700 mt-1">{details.departmentRemarks.audit}</div>
-                          </div>
-                          
-                          <div className="bg-white p-3 rounded border-l-4 border-gray-300">
-                            <div className="font-medium text-gray-600">Finance Admin:</div>
-                            <div className="text-gray-500 mt-1 italic">{details.departmentRemarks.financeAdmin}</div>
-                          </div>
+                          {details.departmentRemarks.audit !== "No remark yet" && (
+                            <div className="bg-white p-3 rounded border-l-4 border-green-500">
+                              <div className="font-medium text-green-800">Audit Department (Your Remark):</div>
+                              <div className="text-gray-700 mt-1">{details.departmentRemarks.audit}</div>
+                            </div>
+                          )}
+                          {details.departmentRemarks.financeAdmin !== "Not reached Finance Admin yet" && (
+                            <div className="bg-white p-3 rounded border-l-4 border-gray-300">
+                              <div className="font-medium text-gray-600">Finance Admin:</div>
+                              <div className="text-gray-500 mt-1 italic">{details.departmentRemarks.financeAdmin}</div>
+                            </div>
+                          )}
+                          {details.departmentRemarks.other !== "No additional remark" && (
+                            <div className="bg-white p-3 rounded border-l-4 border-blue-400">
+                              <div className="font-medium text-blue-800">Other:</div>
+                              <div className="text-gray-700 mt-1">{details.departmentRemarks.other}</div>
+                            </div>
+                          )}
                         </div>
                       </div>
 

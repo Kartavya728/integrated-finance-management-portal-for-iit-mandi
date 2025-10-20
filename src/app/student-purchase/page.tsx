@@ -140,7 +140,7 @@ export default function SnpDashboard() {
         .from("bills")
         .update({
           snp: "Reject",
-          remarks: remarkWithUser,
+          remarks1: remarkWithUser, // SNP department uses remarks1
         })
         .eq("id", bill.id);
 
@@ -148,20 +148,24 @@ export default function SnpDashboard() {
 
       setBills((prev) =>
         prev.map((b) =>
-          b.id === bill.id ? { ...b, snp: "Reject", remarks: remarkWithUser } : b
+          b.id === bill.id ? { ...b, snp: "Reject", remarks1: remarkWithUser } : b
         )
       );
 
       // Send email notification for Reject
-      await sendBillRemarkNotification({
-        billId: bill.id,
-        department: "Student Purchase",
-        remark: remarks[bill.id],
-        action: "Reject",
-        timestamp: new Date().toLocaleString(),
-      });
-
-      alert(`Bill rejected! Email notification sent to employee.`);
+      try {
+        await sendBillRemarkNotification({
+          billId: bill.id,
+          department: "Student Purchase",
+          remark: remarks[bill.id],
+          action: "Reject",
+          timestamp: new Date().toLocaleString(),
+        });
+        alert(`Bill rejected! Email notification sent to employee.`);
+      } catch (emailError) {
+        console.error("Email notification failed:", emailError);
+        alert("Bill rejected! However, email notification failed to send.");
+      }
     } catch (err) {
       console.error("Error rejecting bill:", err);
     }
@@ -180,7 +184,7 @@ export default function SnpDashboard() {
         .from("bills")
         .update({
           snp: "Hold",
-          remarks: remarkWithUser,
+          remarks1: remarkWithUser, // SNP department uses remarks1
         })
         .eq("id", bill.id);
 
@@ -188,20 +192,24 @@ export default function SnpDashboard() {
 
       setBills((prev) =>
         prev.map((b) =>
-          b.id === bill.id ? { ...b, snp: "Hold", remarks: remarkWithUser } : b
+          b.id === bill.id ? { ...b, snp: "Hold", remarks1: remarkWithUser } : b
         )
       );
 
       // Send email notification for Hold
-      await sendBillRemarkNotification({
-        billId: bill.id,
-        department: "Student Purchase",
-        remark: remarks[bill.id],
-        action: "Hold",
-        timestamp: new Date().toLocaleString(),
-      });
-
-      alert(`Bill put on hold! Email notification sent to employee.`);
+      try {
+        await sendBillRemarkNotification({
+          billId: bill.id,
+          department: "Student Purchase",
+          remark: remarks[bill.id],
+          action: "Hold",
+          timestamp: new Date().toLocaleString(),
+        });
+        alert(`Bill put on hold! Email notification sent to employee.`);
+      } catch (emailError) {
+        console.error("Email notification failed:", emailError);
+        alert("Bill put on hold! However, email notification failed to send.");
+      }
     } catch (err) {
       console.error("Error holding bill:", err);
     }

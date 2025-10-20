@@ -248,7 +248,7 @@ export default function FinanceAdminDashboard() {
   /* ---------- Bill Actions ---------- */
   const handleApprove = async (bill: Bill) => {
     try {
-      const remarkText = remarks[bill.id] || bill.remarks || "Approved by Finance Admin";
+      const remarkText = remarks[bill.id] || bill.remarks3 || "Approved by Finance Admin";
       const remarkWithUser = `${remarkText} (By: ${session?.user?.name || 'Finance Admin'} at ${new Date().toLocaleString()})`;
       
       const { error } = await (supabase as any)
@@ -256,7 +256,7 @@ export default function FinanceAdminDashboard() {
         .update({ 
           status: "Accepted", 
           finance_admin: "Approved",
-          remarks: remarkWithUser
+          remarks3: remarkWithUser
         })
         .eq("id", bill.id);
       if (error) throw error;
@@ -264,7 +264,7 @@ export default function FinanceAdminDashboard() {
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id
-            ? { ...b, status: "Accepted", finance_admin: "Approved", remarks: remarkWithUser }
+            ? { ...b, status: "Accepted", finance_admin: "Approved", remarks3: remarkWithUser }
             : b
         )
       );
@@ -288,7 +288,7 @@ export default function FinanceAdminDashboard() {
         .from("bills")
         .update({ 
           finance_admin: "Hold", 
-          remarks: remarkWithUser 
+          remarks3: remarkWithUser 
         })
         .eq("id", bill.id);
       if (error) throw error;
@@ -296,21 +296,25 @@ export default function FinanceAdminDashboard() {
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id
-            ? { ...b, finance_admin: "Hold", remarks: remarkWithUser }
+            ? { ...b, finance_admin: "Hold", remarks3: remarkWithUser }
             : b
         )
       );
 
       // Send email notification
-      await sendBillRemarkNotification({
-        billId: bill.id,
-        department: 'Finance Admin',
-        remark: remarks[bill.id],
-        action: 'Hold',
-        timestamp: new Date().toLocaleString()
-      });
-
-      alert("Bill put on hold! Email notification sent to employee.");
+      try {
+        await sendBillRemarkNotification({
+          billId: bill.id,
+          department: 'Finance Admin',
+          remark: remarks[bill.id],
+          action: 'Hold',
+          timestamp: new Date().toLocaleString()
+        });
+        alert("Bill put on hold! Email notification sent to employee.");
+      } catch (emailError) {
+        console.error("Email notification failed:", emailError);
+        alert("Bill put on hold! However, email notification failed to send.");
+      }
     } catch (err) {
       console.error("Error holding bill:", err);
       alert("Error holding bill");
@@ -328,7 +332,7 @@ export default function FinanceAdminDashboard() {
         .from("bills")
         .update({ 
           finance_admin: "Reject", 
-          remarks: remarkWithUser 
+          remarks3: remarkWithUser 
         })
         .eq("id", bill.id);
       if (error) throw error;
@@ -336,21 +340,25 @@ export default function FinanceAdminDashboard() {
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id
-            ? { ...b, finance_admin: "Reject", remarks: remarkWithUser }
+            ? { ...b, finance_admin: "Reject", remarks3: remarkWithUser }
             : b
         )
       );
 
       // Send email notification
-      await sendBillRemarkNotification({
-        billId: bill.id,
-        department: 'Finance Admin',
-        remark: remarks[bill.id],
-        action: 'Reject',
-        timestamp: new Date().toLocaleString()
-      });
-
-      alert("Bill rejected! Email notification sent to employee.");
+      try {
+        await sendBillRemarkNotification({
+          billId: bill.id,
+          department: 'Finance Admin',
+          remark: remarks[bill.id],
+          action: 'Reject',
+          timestamp: new Date().toLocaleString()
+        });
+        alert("Bill rejected! Email notification sent to employee.");
+      } catch (emailError) {
+        console.error("Email notification failed:", emailError);
+        alert("Bill rejected! However, email notification failed to send.");
+      }
     } catch (err) {
       console.error("Error rejecting bill:", err);
       alert("Error rejecting bill");
@@ -487,9 +495,8 @@ export default function FinanceAdminDashboard() {
       departmentRemarks: {
         snp: bill.remarks1 || "No remark",
         audit: bill.remarks2 || "No remark", 
-        financeAdmin: bill.remarks || "No remark",
-        other: bill.remarks3 || "No remark",
-        additional: bill.remarks4 || "No remark",
+        financeAdmin: bill.remarks3 || "No remark",
+        other: bill.remarks4 || "No remark",
       }
     };
   };
@@ -749,10 +756,10 @@ export default function FinanceAdminDashboard() {
                               )}
 
                               {/* Current Finance Admin Remark */}
-                              {bill.remarks && (
+                              {bill.remarks3 && (
                                 <div className="bg-blue-50 rounded p-3">
                                   <p className="text-sm font-medium mb-1">Your Current Remark:</p>
-                                  <p className="text-sm text-gray-700">{bill.remarks}</p>
+                                  <p className="text-sm text-gray-700">{bill.remarks3}</p>
                                 </div>
                               )}
 
@@ -1238,15 +1245,21 @@ export default function FinanceAdminDashboard() {
                       <div className="bg-yellow-50 rounded-lg p-4">
                         <h4 className="font-semibold mb-3">Department Remarks</h4>
                         <div className="space-y-2 text-sm">
-                          <div className="bg-white p-2 rounded">
-                            <span className="font-medium">SNP:</span> {details.departmentRemarks.snp}
-                          </div>
-                          <div className="bg-white p-2 rounded">
-                            <span className="font-medium">Audit:</span> {details.departmentRemarks.audit}
-                          </div>
-                          <div className="bg-white p-2 rounded">
-                            <span className="font-medium">Finance Admin:</span> {details.departmentRemarks.financeAdmin}
-                          </div>
+                          {details.departmentRemarks.snp !== "No remark" && (
+                            <div className="bg-white p-2 rounded">
+                              <span className="font-medium">SNP:</span> {details.departmentRemarks.snp}
+                            </div>
+                          )}
+                          {details.departmentRemarks.audit !== "No remark" && (
+                            <div className="bg-white p-2 rounded">
+                              <span className="font-medium">Audit:</span> {details.departmentRemarks.audit}
+                            </div>
+                          )}
+                          {details.departmentRemarks.financeAdmin !== "No remark" && (
+                            <div className="bg-white p-2 rounded">
+                              <span className="font-medium">Finance Admin:</span> {details.departmentRemarks.financeAdmin}
+                            </div>
+                          )}
                           {details.departmentRemarks.other !== "No remark" && (
                             <div className="bg-white p-2 rounded">
                               <span className="font-medium">Other:</span> {details.departmentRemarks.other}

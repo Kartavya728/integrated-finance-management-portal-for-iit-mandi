@@ -249,7 +249,7 @@ const EditBillModal: React.FC<EditBillModalProps> = ({
           <div className="grid grid-cols-2 gap-4 mb-6">
             {Object.keys(formData).map((field) => (
               <div key={field} className="col-span-1">
-                <label className="block text-gray-700 capitalize font-medium mb-1">
+                <label className="block text-gray-700 font-medium mb-1">
                   {field.replace(/_/g, " ")}
                   {(field === "employee_id" || field === "employee_name") && (
                     <span className="text-red-500">*</span>
@@ -270,6 +270,7 @@ const EditBillModal: React.FC<EditBillModalProps> = ({
                     onChange={(e) =>
                       setFormData({ ...formData, [field]: e.target.value })
                     }
+                    onWheel={field.includes("value") ? (e) => (e.target as HTMLInputElement).blur() : undefined}
                     className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required={
                       field === "employee_id" || field === "employee_name"

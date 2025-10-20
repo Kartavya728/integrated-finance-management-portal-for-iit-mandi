@@ -76,14 +76,22 @@ export const sendBillRemarkNotification = async (remarkData: BillRemarkData) => 
     };
 
     // Send email via API route
-    await fetch('/api/send-email', {
+    const response = await fetch('/api/send-email', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(emailData),
     });
-    console.log(`Email sent successfully for bill ${remarkData.billId}`);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Email API error:', errorData);
+      throw new Error(`Email API failed: ${errorData.error || 'Unknown error'}`);
+    }
+
+    const result = await response.json();
+    console.log(`Email sent successfully for bill ${remarkData.billId}`, result);
     
   } catch (error) {
     console.error('Error in sendBillRemarkNotification:', error);
