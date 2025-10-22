@@ -9,6 +9,7 @@ import SidebarLinks from "./SidebarLinks";
 import UploadBill from "./UploadBill";
 import BillsHistory from "./BillsHistory";
 import { Bill } from "./types";
+import type { Employee } from "@/types/database";
 
 type PageView = "upload" | "history";
 
@@ -27,7 +28,7 @@ export default function EmployeeDashboard() {
       if (!userId) return;
       setLoading(true);
       try {
-        const { data: emp, error: empErr } = await supabase
+        const { data: emp, error: empErr }: { data: { department: string } | null, error: any } = await supabase
           .from("employees")
           .select("department")
           .eq("id", userId)
@@ -112,6 +113,7 @@ export default function EmployeeDashboard() {
                 activePage={activePage} 
                 setActivePage={setActivePage}
                 open={open}
+                department={department}
               />
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
@@ -128,7 +130,7 @@ export default function EmployeeDashboard() {
       {/* Main Content */}
       <div className="flex flex-1 p-6 overflow-y-auto bg-gray-50">
         {activePage === "upload" && (
-          <UploadBill onBillSubmitted={handleBillSubmitted} />
+          <UploadBill onBillSubmitted={handleBillSubmitted} department={department} />
         )}
 
         {activePage === "history" && (
@@ -141,6 +143,7 @@ export default function EmployeeDashboard() {
           />
         )}
       </div>
+      {/* (Removed global floating department name) */}
     </div>
   );
 }
