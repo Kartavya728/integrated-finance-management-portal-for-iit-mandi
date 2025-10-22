@@ -98,23 +98,23 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) 
         return;
       }
       const normalizedId = normalizeEmployeeId(id);
-      console.log('[DEBUG] Applicant dept lookup start', { rawId: id, normalizedId });
+      console.log('[DEBUG] Applicant dept lookup (from pda_balances) start', { rawId: id, normalizedId });
       try {
-        // Case-sensitive exact match only
-        const { data, error }: { data: Pick<Employee, 'department'> | null; error: any } = await supabase
-          .from("employees")
+        // Case-sensitive exact match only from pda_balances
+        const { data, error }: { data: Pick<PDABalance, 'department'> | null; error: any } = await supabase
+          .from("pda_balances")
           .select("department")
-          .eq("id", normalizedId)
+          .eq("employee_id", normalizedId)
           .maybeSingle();
         if (error) {
-          console.warn('[DEBUG] Applicant dept lookup error (eq only)', error);
+          console.warn('[DEBUG] Applicant dept lookup error (pda_balances, eq only)', error);
           setApplicantDepartment(null);
           return;
         }
-        console.log('[DEBUG] Applicant dept lookup result (eq)', data);
-        setApplicantDepartment(data?.department ?? null);
+        console.log('[DEBUG] Applicant dept lookup result (pda_balances, eq)', data);
+        setApplicantDepartment((data as any)?.department ?? null);
       } catch (err) {
-        console.error('[DEBUG] Exception during applicant dept lookup', err);
+        console.error('[DEBUG] Exception during applicant dept lookup (pda_balances)', err);
         setApplicantDepartment(null);
       }
     };
