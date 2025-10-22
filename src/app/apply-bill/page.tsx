@@ -47,6 +47,8 @@ export default function EmployeeDashboard() {
           .select("*")
           .eq("employee_department", dept)
           .not("employee_department", "is", null)
+          .or("snp.eq.Reject,audit.eq.Reject,finance_admin.eq.Reject")
+          .or("noted.is.null,noted.eq.false")
           .order("created_at", { ascending: false });
         if (error) throw error;
         setBills(data || []);
@@ -71,6 +73,8 @@ export default function EmployeeDashboard() {
           .select("*")
           .eq("employee_department", department)
           .not("employee_department", "is", null)
+          .or("snp.eq.Reject,audit.eq.Reject,finance_admin.eq.Reject")
+          .or("noted.is.null,noted.eq.false")
           .order("created_at", { ascending: false });
         if (error) throw error;
         setBills(data || []);
@@ -91,6 +95,8 @@ export default function EmployeeDashboard() {
           .select("*")
           .eq("employee_department", department)
           .not("employee_department", "is", null)
+          .or("snp.eq.Reject,audit.eq.Reject,finance_admin.eq.Reject")
+          .or("noted.is.null,noted.eq.false")
           .order("created_at", { ascending: false });
         if (error) throw error;
         setBills(data || []);
@@ -99,6 +105,11 @@ export default function EmployeeDashboard() {
       }
     };
     fetchBills();
+  };
+
+  const handleBillNoted = (billId: string) => {
+    // Remove the bill from the current view immediately
+    setBills(prev => prev.filter(bill => bill.id !== billId));
   };
 
   return (
@@ -140,6 +151,7 @@ export default function EmployeeDashboard() {
             onBillUpdated={handleBillUpdated}
             allowDelete
             enableEdit={false}
+            onBillNoted={handleBillNoted}
           />
         )}
       </div>

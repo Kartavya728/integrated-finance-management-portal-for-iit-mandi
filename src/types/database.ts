@@ -37,6 +37,7 @@ export interface Database {
           audit: string | null
           finance_admin: string | null
           employee_department: string | null
+          noted: boolean | null
         }
         Insert: {
           id?: string
@@ -65,6 +66,7 @@ export interface Database {
           audit?: string | null
           finance_admin?: string | null
           employee_department?: string | null
+          noted?: boolean | null
         }
         Update: {
           id?: string
@@ -93,6 +95,7 @@ export interface Database {
           audit?: string | null
           finance_admin?: string | null
           employee_department?: string | null
+          noted?: boolean | null
         }
       }
       employees: {
@@ -127,18 +130,21 @@ export interface Database {
           employee_id: string | null
           balance: number | null
           updated_at: string | null
+          department: string | null
         }
         Insert: {
           id?: string
           employee_id?: string | null
           balance?: number | null
           updated_at?: string | null
+          department?: string | null
         }
         Update: {
           id?: string
           employee_id?: string | null
           balance?: number | null
           updated_at?: string | null
+          department?: string | null
         }
       }
     }

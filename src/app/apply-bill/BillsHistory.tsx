@@ -11,6 +11,7 @@ interface BillsHistoryProps {
   alwaysEditable?: boolean; // if true, show Edit for all rows
   allowDelete?: boolean;    // if true, show Delete for each row
   enableEdit?: boolean;     // if false, hide Edit UI completely
+  onBillNoted?: (billId: string) => void; // Callback when a bill is noted
 }
 
 const BillsHistory: React.FC<BillsHistoryProps> = ({ 
@@ -20,9 +21,10 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
   alwaysEditable = false,
   allowDelete = false,
   enableEdit = true,
+  onBillNoted,
 }) => {
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [notingId, setNotingId] = useState<string | null>(null);
 
   const canEditBill = (bill: Bill) => {
     if (alwaysEditable) return true;
@@ -30,20 +32,30 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
     return bill.snp === "Hold" || bill.audit === "Hold";
   };
 
-  const handleDelete = async (billId: string) => {
-    if (!allowDelete) return;
-    const confirmed = window.confirm("Are you sure you want to delete this bill?");
+  const handleNoted = async (billId: string) => {
+    if (!allowDelete || !onBillNoted) return;
+    const confirmed = window.confirm("Mark this bill as noted? It will be permanently removed from your view.");
     if (!confirmed) return;
     try {
-      setDeletingId(billId);
-      const { error } = await supabase.from("bills").delete().eq("id", billId);
-      if (error) throw error;
-      onBillUpdated();
+      setNotingId(billId);
+      // Update the bill in database to mark as noted
+      const { error } = await (supabase.from("bills") as any)
+        .update({ noted: true })
+        .eq("id", billId);
+      
+      if (error) {
+        console.error("Error updating bill as noted:", error);
+        alert("Error marking bill as noted");
+        return;
+      }
+      
+      // Call the callback to remove the bill from the current view
+      onBillNoted(billId);
     } catch (err) {
-      console.error("Error deleting bill:", err);
-      alert("Error deleting bill");
+      console.error("Error noting bill:", err);
+      alert("Error noting bill");
     } finally {
-      setDeletingId(null);
+      setNotingId(null);
     }
   };
 
@@ -128,7 +140,7 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
               )}
               {allowDelete && (
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Delete
+                  Noted
                 </th>
               )}
             </tr>
@@ -206,11 +218,11 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
                 {allowDelete && (
                   <td className="px-3 py-4 whitespace-nowrap text-sm font-medium">
                     <button
-                      onClick={() => handleDelete(bill.id)}
-                      disabled={deletingId === bill.id}
-                      className="inline-flex items-center text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-md transition-colors disabled:opacity-50"
+                      onClick={() => handleNoted(bill.id)}
+                      disabled={notingId === bill.id}
+                      className="inline-flex items-center px-3 py-1 rounded-md transition-colors disabled:opacity-50 text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100"
                     >
-                      {deletingId === bill.id ? "Deleting..." : "Delete"}
+                      {notingId === bill.id ? "Noting..." : "Noted"}
                     </button>
                   </td>
                 )}

@@ -33,7 +33,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) 
 
   // Helpers for sanitization
   const normalizeText = (val: string) => val.replace(/\s+/g, " ").trim();
-  const normalizeEmployeeId = (val: string) => normalizeText(val); // no capitalization
+  const normalizeEmployeeId = (val: string) => val.replace(/\s+/g, "").trim(); // Remove ALL whitespace including newlines
 
   // DEBUG: Log normalized employee id and current formData
   useEffect(() => {
@@ -44,32 +44,26 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) 
     console.log('[DEBUG] formData:', formData);
   }, [formData]);
 
-  // Robust PDA balance lookup (handles case/whitespace)
+  // Robust PDA balance lookup (handles whitespace removal)
   const fetchPdaBalanceById = async (rawId: string) => {
     const id = normalizeEmployeeId(rawId);
-    // 1) exact match
+    // Case-sensitive exact match with whitespace removed
     let { data, error }: { data: PDABalance | null; error: any } = await supabase
       .from("pda_balances")
       .select("employee_id,balance,department")
       .eq("employee_id", id)
       .maybeSingle();
     if (data && !error) return data.balance as number | null;
-    // 2) case-insensitive match (kept only for PDA balance)
-    const res2: { data: PDABalance | null; error: any } = await supabase
+    
+    // If exact match fails, try to find by comparing normalized values
+    const res2 = await supabase
       .from("pda_balances")
       .select("employee_id,balance,department")
-      .ilike("employee_id", id)
-      .maybeSingle();
-    if (res2.data && !res2.error) return res2.data.balance as number | null;
-    const res3 = await supabase
-      .from("pda_balances")
-      .select("employee_id,balance,department")
-      .ilike("employee_id", `%${id}%`)
-      .limit(5);
-    if ((res3 as any).data && (res3 as any).data.length > 0) {
-      const list = (res3 as any).data as PDABalance[];
+      .limit(10);
+    if (res2.data && res2.data.length > 0) {
+      const list = res2.data as PDABalance[];
       const exact = list.find((r) => normalizeEmployeeId(r.employee_id || "") === id);
-      return (exact?.balance ?? list[0]?.balance) as number | null;
+      return (exact?.balance ?? null) as number | null;
     }
     return null;
   };
@@ -100,19 +94,38 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) 
       const normalizedId = normalizeEmployeeId(id);
       console.log('[DEBUG] Applicant dept lookup (from pda_balances) start', { rawId: id, normalizedId });
       try {
-        // Case-sensitive exact match only from pda_balances
-        const { data, error }: { data: Pick<PDABalance, 'department'> | null; error: any } = await supabase
+        // Case-sensitive exact match with whitespace removed
+        const { data, error } = await supabase
           .from("pda_balances")
-          .select("department")
+          .select("department, employee_id")
           .eq("employee_id", normalizedId)
           .maybeSingle();
-        if (error) {
-          console.warn('[DEBUG] Applicant dept lookup error (pda_balances, eq only)', error);
-          setApplicantDepartment(null);
+        
+        if (data && !error) {
+          console.log('[DEBUG] Applicant dept lookup result (pda_balances, exact match)', data);
+          setApplicantDepartment((data as any)?.department ?? null);
           return;
         }
-        console.log('[DEBUG] Applicant dept lookup result (pda_balances, eq)', data);
-        setApplicantDepartment((data as any)?.department ?? null);
+        
+        // If exact match fails, try to find by comparing normalized values
+        const res2 = await supabase
+          .from("pda_balances")
+          .select("employee_id, department")
+          .limit(10);
+        
+        if (res2.data && res2.data.length > 0) {
+          console.log('[DEBUG] Sample pda_balances data:', res2.data);
+          const list = res2.data as Array<{employee_id: string | null, department: string | null}>;
+          const exact = list.find((r) => normalizeEmployeeId(r.employee_id || "") === normalizedId);
+          if (exact?.department) {
+            console.log('[DEBUG] Applicant dept lookup result (pda_balances, normalized match)', exact);
+            setApplicantDepartment(exact.department);
+            return;
+          }
+        }
+        
+        console.log('[DEBUG] Applicant dept lookup result (pda_balances) - no match found');
+        setApplicantDepartment(null);
       } catch (err) {
         console.error('[DEBUG] Exception during applicant dept lookup (pda_balances)', err);
         setApplicantDepartment(null);
@@ -202,32 +215,17 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) 
     Object.keys(normalizedData).forEach((key) => {
       if (normalizedData[key] === "") normalizedData[key] = null;
     });
-    // --- NEW: Fetch department and set employee_department ---
-    try {
-      console.log('[DEBUG] Submit enrichment: fetching employee department (eq only)', { normalizedEmployeeId });
-      // Case-sensitive exact match only
-      const { data: emp, error: empErr }: { data: Pick<Employee,'department'> | null; error: any } = await supabase
-        .from("employees")
-        .select("department")
-        .eq("id", normalizedEmployeeId)
-        .maybeSingle();
-      if (empErr || !emp?.department) {
-        alert('[ERROR] Could not find department for this employee.');
-        console.error('[DEBUG] Department fetch error (eq only):', empErr);
-        return;
-      }
-      normalizedData.employee_department = emp.department;
-      console.log('[DEBUG] Found employee department:', emp.department);
-    } catch (fetchErr: any) {
-      alert('[ERROR] Exception while fetching department: ' + (fetchErr.message || fetchErr));
-      console.error('[DEBUG] Exception fetching department:', fetchErr);
+    // --- Use applicant department from pda_balances (already fetched above) ---
+    if (!applicantDepartment) {
+      alert('[ERROR] Could not find department for this employee in PDA balances.');
       return;
     }
+    normalizedData.employee_department = applicantDepartment;
+    console.log('[DEBUG] Using applicant department from pda_balances:', applicantDepartment);
     // Now insert as before
     try {
       console.log('[DEBUG] Inserting bill with normalizedData:', normalizedData);
-      const insertPayload: BillInsert = normalizedData as BillInsert;
-      const { error: insertErr } = await supabase.from("bills").insert([insertPayload]);
+      const { error: insertErr } = await (supabase.from("bills") as any).insert([normalizedData]);
       if (insertErr) {
         alert('[ERROR] Failed to upload bill!: ' + insertErr.message);
         console.error('[DEBUG] Failed to upload bill:', insertErr.message);
@@ -277,13 +275,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) 
                 value={formData[field]}
                 onChange={(e) => {
                   const raw = e.target.value;
-                  if (field === "employee_id") {
-                    setFormData({ ...formData, [field]: normalizeEmployeeId(raw) as any });
-                  } else if (typeof raw === 'string') {
-                    setFormData({ ...formData, [field]: raw });
-                  } else {
-                    setFormData({ ...formData, [field]: raw as any });
-                  }
+                  setFormData({ ...formData, [field]: raw });
                 }}
                 className="w-full border p-2 rounded"
               >

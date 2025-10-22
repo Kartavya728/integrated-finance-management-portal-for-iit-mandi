@@ -459,6 +459,11 @@ export default function FinanceAdminDashboard() {
       onClick: () => setActivePage("review-bills"),
     },
     {
+      label: "All Bills",
+      icon: <IconFileText className="h-5 w-5 shrink-0 text-indigo-500" />,
+      onClick: () => window.location.assign("/bills"),
+    },
+    {
       label: "Hold Bills",
       icon: <IconClockPause className="h-5 w-5 shrink-0 text-yellow-600" />,
       onClick: () => setActivePage("hold-bills"),
