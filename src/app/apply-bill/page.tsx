@@ -8,10 +8,10 @@ import { Logo, LogoIcon } from "./Logo";
 import SidebarLinks from "./SidebarLinks";
 import UploadBill from "./UploadBill";
 import BillsHistory from "./BillsHistory";
+import ApprovedBills from "./ApprovedBills"; // ✅ import the ApprovedBills component
 import { Bill } from "./types";
-import type { Employee } from "@/types/database";
 
-type PageView = "upload" | "history";
+type PageView = "upload" | "history" | "approved"; // ✅ add new page type
 
 export default function EmployeeDashboard() {
   const { data: session } = useSession();
@@ -21,18 +21,21 @@ export default function EmployeeDashboard() {
   const [activePage, setActivePage] = useState<PageView>("upload");
   const [department, setDepartment] = useState<string | null>(null);
 
-  // Resolve user's department, then fetch department-scoped bills
+  // Fetch department and bills
   useEffect(() => {
     const fetchDepartmentAndBills = async () => {
       const userId = session?.user?.id;
       if (!userId) return;
+
       setLoading(true);
       try {
-        const { data: emp, error: empErr }: { data: { department: string } | null, error: any } = await supabase
+        // Fetch department of the employee
+        const { data: emp, error: empErr } = await supabase
           .from("employees")
           .select("department")
           .eq("id", userId)
           .single();
+
         if (empErr) throw empErr;
         const dept = emp?.department || null;
         setDepartment(dept);
@@ -42,6 +45,7 @@ export default function EmployeeDashboard() {
           return;
         }
 
+        // Fetch department bills (not approved)
         const { data, error } = await supabase
           .from("bills")
           .select("*")
@@ -50,6 +54,7 @@ export default function EmployeeDashboard() {
           .or("snp.eq.Reject,audit.eq.Reject,finance_admin.eq.Reject")
           .or("noted.is.null,noted.eq.false")
           .order("created_at", { ascending: false });
+
         if (error) throw error;
         setBills(data || []);
       } catch (err) {
@@ -59,57 +64,37 @@ export default function EmployeeDashboard() {
         setLoading(false);
       }
     };
+
     fetchDepartmentAndBills();
   }, [session, activePage]);
 
   const handleBillSubmitted = () => {
     setActivePage("history");
-    // Refresh bills after submission
-    const fetchBills = async () => {
-      try {
-        if (!department) return;
-        const { data, error } = await supabase
-          .from("bills")
-          .select("*")
-          .eq("employee_department", department)
-          .not("employee_department", "is", null)
-          .or("snp.eq.Reject,audit.eq.Reject,finance_admin.eq.Reject")
-          .or("noted.is.null,noted.eq.false")
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        setBills(data || []);
-      } catch (err) {
-        console.error("Error fetching bills:", err);
-      }
-    };
-    fetchBills();
+    refreshBills();
   };
 
-  const handleBillUpdated = () => {
-    // Refresh bills after update
-    const fetchBills = async () => {
-      try {
-        if (!department) return;
-        const { data, error } = await supabase
-          .from("bills")
-          .select("*")
-          .eq("employee_department", department)
-          .not("employee_department", "is", null)
-          .or("snp.eq.Reject,audit.eq.Reject,finance_admin.eq.Reject")
-          .or("noted.is.null,noted.eq.false")
-          .order("created_at", { ascending: false });
-        if (error) throw error;
-        setBills(data || []);
-      } catch (err) {
-        console.error("Error fetching bills:", err);
-      }
-    };
-    fetchBills();
-  };
+  const handleBillUpdated = () => refreshBills();
 
   const handleBillNoted = (billId: string) => {
-    // Remove the bill from the current view immediately
-    setBills(prev => prev.filter(bill => bill.id !== billId));
+    setBills((prev) => prev.filter((bill) => bill.id !== billId));
+  };
+
+  const refreshBills = async () => {
+    try {
+      if (!department) return;
+      const { data, error } = await supabase
+        .from("bills")
+        .select("*")
+        .eq("employee_department", department)
+        .not("employee_department", "is", null)
+        .or("snp.eq.Reject,audit.eq.Reject,finance_admin.eq.Reject")
+        .or("noted.is.null,noted.eq.false")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setBills(data || []);
+    } catch (err) {
+      console.error("Error refreshing bills:", err);
+    }
   };
 
   return (
@@ -120,12 +105,36 @@ export default function EmployeeDashboard() {
           <div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
             {open ? <Logo /> : <LogoIcon />}
             <div className="mt-8 flex flex-col gap-2">
-              <SidebarLinks 
-                activePage={activePage} 
-                setActivePage={setActivePage}
-                open={open}
-                department={department}
-              />
+              {/* === Sidebar Links === */}
+              <button
+                onClick={() => setActivePage("upload")}
+                className={`flex items-center gap-2 px-3 py-2 rounded ${
+                  activePage === "upload" ? "bg-gray-200 font-semibold" : "hover:bg-gray-100"
+                }`}
+              >
+                {open && "Apply Bill"}
+              </button>
+
+              <button
+                onClick={() => setActivePage("history")}
+                className={`flex items-center gap-2 px-3 py-2 rounded ${
+                  activePage === "history" ? "bg-gray-200 font-semibold" : "hover:bg-gray-100"
+                }`}
+              >
+                {open && "Bill History"}
+              </button>
+
+              {/* ✅ New Approved Bills Sidebar Option */}
+              <button
+                onClick={() => setActivePage("approved")}
+                className={`flex items-center gap-2 px-3 py-2 rounded ${
+                  activePage === "approved" ? "bg-gray-200 font-semibold" : "hover:bg-gray-100"
+                }`}
+              >
+                {open && "Approved Bills"}
+              </button>
+
+              {/* Logout */}
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-left w-full mt-4"
@@ -145,8 +154,8 @@ export default function EmployeeDashboard() {
         )}
 
         {activePage === "history" && (
-          <BillsHistory 
-            bills={bills} 
+          <BillsHistory
+            bills={bills}
             loading={loading}
             onBillUpdated={handleBillUpdated}
             allowDelete
@@ -154,8 +163,10 @@ export default function EmployeeDashboard() {
             onBillNoted={handleBillNoted}
           />
         )}
+
+        {/* ✅ Approved Bills page rendering */}
+        {activePage === "approved" && <ApprovedBills department={department} />}
       </div>
-      {/* (Removed global floating department name) */}
     </div>
   );
 }

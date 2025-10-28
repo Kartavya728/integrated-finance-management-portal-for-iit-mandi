@@ -1,9 +1,8 @@
 "use client";
-
+import { signOut, useSession, signIn } from "next-auth/react";
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../utils/supabase/client";
-import { signOut, useSession } from "next-auth/react";
 import { sendBillRemarkNotification } from "../../helpers/emailService";
 import {
   IconArrowLeft,
@@ -153,6 +152,7 @@ export default function FinanceAdminDashboard() {
   const [passwordAction, setPasswordAction] = useState<string>("");
   const [enteredPassword, setEnteredPassword] = useState("");
   const [targetEmployeeId, setTargetEmployeeId] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
 
   // for bill actions
   const [expandedBill, setExpandedBill] = useState<string | null>(null);
@@ -169,7 +169,7 @@ export default function FinanceAdminDashboard() {
     department: "School of Computing & Electrical Engineering",
   });
 
-  const FINANCE_ADMIN_PASSWORD = "admin123"; // In production, this should be in environment variables
+  //const FINANCE_ADMIN_PASSWORD = "admin123"; // In production, this should be in environment variables
 
   // fetch bills
   useEffect(() => {
@@ -215,18 +215,42 @@ export default function FinanceAdminDashboard() {
     setEnteredPassword("");
   };
 
-  const verifyPassword = () => {
-    if (enteredPassword !== FINANCE_ADMIN_PASSWORD) {
-      alert("Incorrect password!");
-      return false;
-    }
-    setShowPasswordModal(false);
-    setEnteredPassword("");
-    return true;
-  };
+  const verifyPassword = async () => {
+      // We need the user's username to re-authenticate.
+      // This assumes the username is stored in the session.
+      // Check your console.log(session.user) to see if it's 'username', 'email', or 'name'
+      const loginIdentifier = session?.user?.username || session?.user?.email;
 
+      if (!loginIdentifier) {
+        alert("Error: Could not find user identifier in session. Please log out and log in again.");
+        return false;
+      }
+
+      setIsVerifying(true);
+
+      // Use the exact same 'signIn' method as the login page
+      const res = await signIn("credentials", {
+        redirect: false, // Tells NextAuth not to redirect the page
+        username: loginIdentifier, // Use the logged-in user's username/email
+        password: enteredPassword, // Use the password from the modal
+      });
+
+      setIsVerifying(false);
+
+      if (res?.error) {
+        console.error("Re-authentication failed:", res.error);
+        alert("Incorrect password! Please try again.");
+        return false;
+      }
+
+      // Password is correct
+      setShowPasswordModal(false);
+      setEnteredPassword("");
+      return true;
+    };
   const executePasswordProtectedAction = async () => {
-    if (!verifyPassword()) return;
+    const isVerified = await verifyPassword();
+    if (!isVerified) return;
 
     switch (passwordAction) {
       case "delete":
@@ -248,7 +272,7 @@ export default function FinanceAdminDashboard() {
   /* ---------- Bill Actions ---------- */
   const handleApprove = async (bill: Bill) => {
     try {
-      const remarkText = remarks[bill.id] || bill.remarks3 || "Approved by Finance Admin";
+      const remarkText = remarks[bill.id] || bill.remarks || "Approved by Finance Admin";
       const remarkWithUser = `${remarkText} (By: ${session?.user?.name || 'Finance Admin'} at ${new Date().toLocaleString()})`;
       
       const { error } = await (supabase as any)
@@ -256,7 +280,7 @@ export default function FinanceAdminDashboard() {
         .update({ 
           status: "Accepted", 
           finance_admin: "Approved",
-          remarks3: remarkWithUser
+          remarks: remarkWithUser
         })
         .eq("id", bill.id);
       if (error) throw error;
@@ -264,7 +288,7 @@ export default function FinanceAdminDashboard() {
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id
-            ? { ...b, status: "Accepted", finance_admin: "Approved", remarks3: remarkWithUser }
+            ? { ...b, status: "Accepted", finance_admin: "Approved", remarks: remarkWithUser }
             : b
         )
       );
@@ -288,7 +312,7 @@ export default function FinanceAdminDashboard() {
         .from("bills")
         .update({ 
           finance_admin: "Hold", 
-          remarks3: remarkWithUser 
+          remarks: remarkWithUser 
         })
         .eq("id", bill.id);
       if (error) throw error;
@@ -296,25 +320,21 @@ export default function FinanceAdminDashboard() {
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id
-            ? { ...b, finance_admin: "Hold", remarks3: remarkWithUser }
+            ? { ...b, finance_admin: "Hold", remarks: remarkWithUser }
             : b
         )
       );
 
       // Send email notification
-      try {
-        await sendBillRemarkNotification({
-          billId: bill.id,
-          department: 'Finance Admin',
-          remark: remarks[bill.id],
-          action: 'Hold',
-          timestamp: new Date().toLocaleString()
-        });
-        alert("Bill put on hold! Email notification sent to employee.");
-      } catch (emailError) {
-        console.error("Email notification failed:", emailError);
-        alert("Bill put on hold! However, email notification failed to send.");
-      }
+      await sendBillRemarkNotification({
+        billId: bill.id,
+        department: 'Finance Admin',
+        remark: remarks[bill.id],
+        action: 'Hold',
+        timestamp: new Date().toLocaleString()
+      });
+
+      alert("Bill put on hold! Email notification sent to employee.");
     } catch (err) {
       console.error("Error holding bill:", err);
       alert("Error holding bill");
@@ -332,7 +352,7 @@ export default function FinanceAdminDashboard() {
         .from("bills")
         .update({ 
           finance_admin: "Reject", 
-          remarks3: remarkWithUser 
+          remarks: remarkWithUser 
         })
         .eq("id", bill.id);
       if (error) throw error;
@@ -340,25 +360,21 @@ export default function FinanceAdminDashboard() {
       setBills((prev) =>
         prev.map((b) =>
           b.id === bill.id
-            ? { ...b, finance_admin: "Reject", remarks3: remarkWithUser }
+            ? { ...b, finance_admin: "Reject", remarks: remarkWithUser }
             : b
         )
       );
 
       // Send email notification
-      try {
-        await sendBillRemarkNotification({
-          billId: bill.id,
-          department: 'Finance Admin',
-          remark: remarks[bill.id],
-          action: 'Reject',
-          timestamp: new Date().toLocaleString()
-        });
-        alert("Bill rejected! Email notification sent to employee.");
-      } catch (emailError) {
-        console.error("Email notification failed:", emailError);
-        alert("Bill rejected! However, email notification failed to send.");
-      }
+      await sendBillRemarkNotification({
+        billId: bill.id,
+        department: 'Finance Admin',
+        remark: remarks[bill.id],
+        action: 'Reject',
+        timestamp: new Date().toLocaleString()
+      });
+
+      alert("Bill rejected! Email notification sent to employee.");
     } catch (err) {
       console.error("Error rejecting bill:", err);
       alert("Error rejecting bill");
@@ -459,11 +475,6 @@ export default function FinanceAdminDashboard() {
       onClick: () => setActivePage("review-bills"),
     },
     {
-      label: "All Bills",
-      icon: <IconFileText className="h-5 w-5 shrink-0 text-indigo-500" />,
-      onClick: () => window.location.assign("/bills"),
-    },
-    {
       label: "Hold Bills",
       icon: <IconClockPause className="h-5 w-5 shrink-0 text-yellow-600" />,
       onClick: () => setActivePage("hold-bills"),
@@ -500,8 +511,9 @@ export default function FinanceAdminDashboard() {
       departmentRemarks: {
         snp: bill.remarks1 || "No remark",
         audit: bill.remarks2 || "No remark", 
-        financeAdmin: bill.remarks3 || "No remark",
-        other: bill.remarks4 || "No remark",
+        financeAdmin: bill.remarks || "No remark",
+        other: bill.remarks3 || "No remark",
+        additional: bill.remarks4 || "No remark",
       }
     };
   };
@@ -761,10 +773,10 @@ export default function FinanceAdminDashboard() {
                               )}
 
                               {/* Current Finance Admin Remark */}
-                              {bill.remarks3 && (
+                              {bill.remarks && (
                                 <div className="bg-blue-50 rounded p-3">
                                   <p className="text-sm font-medium mb-1">Your Current Remark:</p>
-                                  <p className="text-sm text-gray-700">{bill.remarks3}</p>
+                                  <p className="text-sm text-gray-700">{bill.remarks}</p>
                                 </div>
                               )}
 
@@ -1250,21 +1262,15 @@ export default function FinanceAdminDashboard() {
                       <div className="bg-yellow-50 rounded-lg p-4">
                         <h4 className="font-semibold mb-3">Department Remarks</h4>
                         <div className="space-y-2 text-sm">
-                          {details.departmentRemarks.snp !== "No remark" && (
-                            <div className="bg-white p-2 rounded">
-                              <span className="font-medium">SNP:</span> {details.departmentRemarks.snp}
-                            </div>
-                          )}
-                          {details.departmentRemarks.audit !== "No remark" && (
-                            <div className="bg-white p-2 rounded">
-                              <span className="font-medium">Audit:</span> {details.departmentRemarks.audit}
-                            </div>
-                          )}
-                          {details.departmentRemarks.financeAdmin !== "No remark" && (
-                            <div className="bg-white p-2 rounded">
-                              <span className="font-medium">Finance Admin:</span> {details.departmentRemarks.financeAdmin}
-                            </div>
-                          )}
+                          <div className="bg-white p-2 rounded">
+                            <span className="font-medium">SNP:</span> {details.departmentRemarks.snp}
+                          </div>
+                          <div className="bg-white p-2 rounded">
+                            <span className="font-medium">Audit:</span> {details.departmentRemarks.audit}
+                          </div>
+                          <div className="bg-white p-2 rounded">
+                            <span className="font-medium">Finance Admin:</span> {details.departmentRemarks.financeAdmin}
+                          </div>
                           {details.departmentRemarks.other !== "No remark" && (
                             <div className="bg-white p-2 rounded">
                               <span className="font-medium">Other:</span> {details.departmentRemarks.other}
