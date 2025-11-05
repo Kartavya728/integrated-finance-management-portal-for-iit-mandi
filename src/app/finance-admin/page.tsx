@@ -21,6 +21,7 @@ import {
 } from "@tabler/icons-react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import EditEmployeeForm from "@/components/EditEmployeeForm";
 
 // Allowed departments
 const DEPARTMENTS = [
@@ -133,6 +134,7 @@ interface Employee {
   email: string;
   department: string;
   employee_type: string;
+  employee_code: string;
 }
 
 type PageView = "dashboard" | "review-bills" | "hold-bills" | "employees";
@@ -147,7 +149,7 @@ export default function FinanceAdminDashboard() {
 
   const [activePage, setActivePage] = useState<PageView>("dashboard");
 
-  const [editingEmployee, setEditingEmployee] = useState<string | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordAction, setPasswordAction] = useState<string>("");
   const [enteredPassword, setEnteredPassword] = useState("");
@@ -163,10 +165,11 @@ export default function FinanceAdminDashboard() {
   // Add employee form
   const [showAddEmployeeForm, setShowAddEmployeeForm] = useState(false);
   const [newEmployee, setNewEmployee] = useState({
-    username: "",
-    name: "",
+    employee_name: "",
     email: "",
-    department: "School of Computing & Electrical Engineering",
+    employee_type: "Finance Employee",
+    department: "Finance and Accounts",
+    employee_code: "",
   });
 
   //const FINANCE_ADMIN_PASSWORD = "admin123"; // In production, this should be in environment variables
@@ -207,10 +210,43 @@ export default function FinanceAdminDashboard() {
     if (activePage === "employees") fetchEmployees();
   }, [activePage]);
 
+  const handleEditEmployee = (employee: Employee) => {
+    setEditingEmployee(employee);
+  };
+
+  const handleSaveEmployee = async (updatedEmployee: Employee) => {
+    try {
+      const response = await fetch(`/api/employees/${updatedEmployee.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedEmployee),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update employee");
+      }
+
+      setEmployees((prev) =>
+        prev.map((e) => (e.id === updatedEmployee.id ? updatedEmployee : e))
+      );
+      setEditingEmployee(null);
+    } catch (error) {
+      console.error("Error updating employee:", error);
+    }
+  };
+
   /* ---------- Password Protection ---------- */
   const handlePasswordAction = (action: string, employeeId?: string) => {
     setPasswordAction(action);
     setTargetEmployeeId(employeeId || "");
+    if (action === "edit") {
+      const employeeToEdit = employees.find((e) => e.id === employeeId);
+      if (employeeToEdit) {
+        setEditingEmployee(employeeToEdit);
+      }
+    }
     setShowPasswordModal(true);
     setEnteredPassword("");
   };
@@ -263,7 +299,10 @@ export default function FinanceAdminDashboard() {
         break;
       case "edit":
         if (targetEmployeeId) {
-          setEditingEmployee(targetEmployeeId);
+          const employeeToEdit = employees.find((e) => e.id === targetEmployeeId);
+          if (employeeToEdit) {
+            setEditingEmployee(employeeToEdit);
+          }
         }
         break;
     }
@@ -421,18 +460,19 @@ export default function FinanceAdminDashboard() {
 
   const handleAddEmployee = async () => {
     try {
-      if (!newEmployee.username || !newEmployee.name) {
-        alert("Username and name are required!");
+      if (!newEmployee.employee_name || !newEmployee.email || !newEmployee.employee_code) {
+        alert("Employee name, email, and code are required!");
         return;
       }
 
       const { data, error } = await (supabase as any)
         .from("employees")
         .insert({
-          username: newEmployee.username,
-          name: newEmployee.name,
+          employee_name: newEmployee.employee_name,
           email: newEmployee.email,
+          employee_type: newEmployee.employee_type,
           department: newEmployee.department,
+          employee_code: newEmployee.employee_code,
         })
         .select();
 
@@ -441,10 +481,11 @@ export default function FinanceAdminDashboard() {
       if (data) {
         setEmployees((prev) => [...prev, ...data]);
         setNewEmployee({
-          username: "",
-          name: "",
+          employee_name: "",
           email: "",
-          department: "School of Computing & Electrical Engineering",
+          employee_type: "Finance Employee",
+          department: "Finance and Accounts",
+          employee_code: "",
         });
         setShowAddEmployeeForm(false);
         alert("Employee added successfully!");
@@ -961,13 +1002,16 @@ export default function FinanceAdminDashboard() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Username
+                      ID
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Department
@@ -981,34 +1025,21 @@ export default function FinanceAdminDashboard() {
                   {employees.map((emp) => (
                     <tr key={emp.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {emp.username}
+                        {emp.id}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {emp.name}
+                        {emp.employee_name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {emp.email || "N/A"}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {emp.employee_type}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {editingEmployee === emp.id ? (
-                          <select
-                            value={emp.department}
-                            onChange={(e) => 
-                              handleUpdateEmployee(emp.id, { 
-                                department: e.target.value,
-                              })
-                            }
-                            className="border px-3 py-1 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          >
-                            {DEPARTMENTS.map((d) => (
-                              <option key={d} value={d}>{d}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded">
-                            {emp.department}
-                          </span>
-                        )}
+                        <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded">
+                          {emp.department}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                         {editingEmployee === emp.id ? (
@@ -1117,29 +1148,18 @@ export default function FinanceAdminDashboard() {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Username *</label>
-                  <input
-                    type="text"
-                    value={newEmployee.username}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, username: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter username"
-                  />
-                </div>
-                
-                <div>
                   <label className="block text-sm font-medium mb-1">Full Name *</label>
                   <input
                     type="text"
-                    value={newEmployee.name}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
+                    value={newEmployee.employee_name}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, employee_name: e.target.value })}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter full name"
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <label className="block text-sm font-medium mb-1">Email *</label>
                   <input
                     type="email"
                     value={newEmployee.email}
@@ -1147,6 +1167,34 @@ export default function FinanceAdminDashboard() {
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter email address"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Employee Code *</label>
+                  <input
+                    type="text"
+                    value={newEmployee.employee_code}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, employee_code: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter employee code"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Employee Type</label>
+                  <select
+                    value={newEmployee.employee_type}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, employee_type: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Finance Admin">Finance Admin</option>
+                    <option value="Finance Employee">Finance Employee</option>
+                    <option value="Audit">Audit</option>
+                    <option value="Bill Employee">Bill Employee</option>
+                    <option value="Student Purchase">Student Purchase</option>
+                    <option value="bill_employee_edit">bill_employee_edit</option>
+                    <option value="bill_employee_fill">bill_employee_fill</option>
+                  </select>
                 </div>
                 
                 <div>
@@ -1174,10 +1222,11 @@ export default function FinanceAdminDashboard() {
                   onClick={() => {
                     setShowAddEmployeeForm(false);
                     setNewEmployee({
-                      username: "",
-                      name: "",
+                      employee_name: "",
                       email: "",
-                      department: "School of Computing & Electrical Engineering",
+                      employee_type: "Finance Employee",
+                      department: "Finance and Accounts",
+                      employee_code: "",
                     });
                   }}
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
@@ -1286,6 +1335,14 @@ export default function FinanceAdminDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {editingEmployee && (
+        <EditEmployeeForm
+          employee={editingEmployee}
+          onSave={handleSaveEmployee}
+          onCancel={() => setEditingEmployee(null)}
+        />
+      )}
     </div>
   );
 }
