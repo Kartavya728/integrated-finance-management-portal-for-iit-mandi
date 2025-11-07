@@ -38,6 +38,11 @@ export interface Database {
           finance_admin: string | null
           employee_department: string | null
           noted: boolean | null
+          has_bank_guarantee: boolean | null
+          bank_guarantee_details: string | null
+          bank_guarantee_amount: number | null
+          date_of_installation: string | null
+          date_of_delivery: string | null
         }
         Insert: {
           id?: string
@@ -67,6 +72,11 @@ export interface Database {
           finance_admin?: string | null
           employee_department?: string | null
           noted?: boolean | null
+          has_bank_guarantee?: boolean | null
+          bank_guarantee_details?: string | null
+          bank_guarantee_amount?: number | null
+          date_of_installation?: string | null
+          date_of_delivery?: string | null
         }
         Update: {
           id?: string
@@ -96,6 +106,11 @@ export interface Database {
           finance_admin?: string | null
           employee_department?: string | null
           noted?: boolean | null
+          has_bank_guarantee?: boolean | null
+          bank_guarantee_details?: string | null
+          bank_guarantee_amount?: number | null
+          date_of_installation?: string | null
+          date_of_delivery?: string | null
         }
       }
       employees: {

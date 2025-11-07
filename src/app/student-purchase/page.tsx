@@ -59,6 +59,15 @@ export default function SnpDashboard() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedBillDetails, setSelectedBillDetails] = useState<Bill | null>(null);
 
+  // Bank guarantee state variables
+  const [bankGuaranteeData, setBankGuaranteeData] = useState<Record<string, {
+    hasBankGuarantee: boolean;
+    bankGuaranteeDetails: string;
+    bankGuaranteeAmount: string;
+    dateOfInstallation: string;
+    dateOfDelivery: string;
+  }>>({});
+
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("All");
@@ -90,14 +99,54 @@ export default function SnpDashboard() {
     fetchBills();
   }, []);
 
+  // Bank guarantee data handlers
+  const initializeBankGuaranteeData = (billId: string) => {
+    if (!bankGuaranteeData[billId]) {
+      setBankGuaranteeData(prev => ({
+        ...prev,
+        [billId]: {
+          hasBankGuarantee: false,
+          bankGuaranteeDetails: '',
+          bankGuaranteeAmount: '',
+          dateOfInstallation: '',
+          dateOfDelivery: ''
+        }
+      }));
+    }
+  };
+
+  const updateBankGuaranteeData = (billId: string, field: string, value: any) => {
+    setBankGuaranteeData(prev => ({
+      ...prev,
+      [billId]: {
+        ...prev[billId],
+        [field]: value
+      }
+    }));
+  };
+
   // approve handler (new workflow)
   const handleApprove = async (bill: Bill) => {
     try {
+      // Get bank guarantee data for this bill
+      const bgData = bankGuaranteeData[bill.id] || {
+        hasBankGuarantee: false,
+        bankGuaranteeDetails: '',
+        bankGuaranteeAmount: '',
+        dateOfInstallation: '',
+        dateOfDelivery: ''
+      };
+
       // Major/Minor: SNP approves -> if <=50k go to Finance Admin, else go to Audit
       const goToFinanceAdmin = bill.po_value <= 50000;
 
       const updates: any = {
         snp: "Approved",
+        has_bank_guarantee: bgData.hasBankGuarantee,
+        bank_guarantee_details: bgData.hasBankGuarantee ? bgData.bankGuaranteeDetails : null,
+        bank_guarantee_amount: bgData.hasBankGuarantee ? parseFloat(bgData.bankGuaranteeAmount) || null : null,
+        date_of_installation: bgData.dateOfInstallation || null,
+        date_of_delivery: bgData.dateOfDelivery || null
       };
 
       if (goToFinanceAdmin) {
@@ -123,8 +172,11 @@ export default function SnpDashboard() {
             : b
         )
       );
+
+      alert("Bill approved successfully with bank guarantee details!");
     } catch (err) {
       console.error("Error approving bill:", err);
+      alert("Error approving bill. Please try again.");
     }
   };
 
@@ -674,6 +726,84 @@ export default function SnpDashboard() {
                                   </div>
                                 </div>
                               </div>
+
+                              {/* Bank Guarantee Section */}
+                              {canTakeAction && (
+                                <div className="bg-purple-50 p-4 rounded-lg space-y-4">
+                                  <h4 className="font-medium text-purple-800 mb-3">Bank Guarantee Details</h4>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      id={`bank-guarantee-${bill.id}`}
+                                      checked={bankGuaranteeData[bill.id]?.hasBankGuarantee || false}
+                                      onChange={(e) => {
+                                        initializeBankGuaranteeData(bill.id);
+                                        updateBankGuaranteeData(bill.id, 'hasBankGuarantee', e.target.checked);
+                                      }}
+                                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                    />
+                                    <label htmlFor={`bank-guarantee-${bill.id}`} className="text-sm font-medium text-gray-700">
+                                      Bank Guarantee Required
+                                    </label>
+                                  </div>
+
+                                  {bankGuaranteeData[bill.id]?.hasBankGuarantee && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                          Bank Guarantee Details
+                                        </label>
+                                        <textarea
+                                          rows={2}
+                                          placeholder="Enter bank guarantee details..."
+                                          value={bankGuaranteeData[bill.id]?.bankGuaranteeDetails || ''}
+                                          onChange={(e) => updateBankGuaranteeData(bill.id, 'bankGuaranteeDetails', e.target.value)}
+                                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                                        />
+                                      </div>
+                                      
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                          Bank Guarantee Amount (₹)
+                                        </label>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          placeholder="0.00"
+                                          value={bankGuaranteeData[bill.id]?.bankGuaranteeAmount || ''}
+                                          onChange={(e) => updateBankGuaranteeData(bill.id, 'bankGuaranteeAmount', e.target.value)}
+                                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                                        />
+                                      </div>
+                                      
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                          Date of Installation
+                                        </label>
+                                        <input
+                                          type="date"
+                                          value={bankGuaranteeData[bill.id]?.dateOfInstallation || ''}
+                                          onChange={(e) => updateBankGuaranteeData(bill.id, 'dateOfInstallation', e.target.value)}
+                                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                                        />
+                                      </div>
+                                      
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                          Date of Delivery
+                                        </label>
+                                        <input
+                                          type="date"
+                                          value={bankGuaranteeData[bill.id]?.dateOfDelivery || ''}
+                                          onChange={(e) => updateBankGuaranteeData(bill.id, 'dateOfDelivery', e.target.value)}
+                                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
 
                               {/* Remark Input & Actions */}
                               {canTakeAction && (

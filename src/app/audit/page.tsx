@@ -23,6 +23,7 @@ import {
 } from "@tabler/icons-react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import BillCard from "@/components/BillCard";
 
 /* ---------- Interfaces ---------- */
 interface Bill {
@@ -623,13 +624,7 @@ export default function AuditDashboard() {
             </div>
 
             {/* Bills List */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-800">
-                  {activeFilter} Bills - Audit Department
-                </h2>
-              </div>
-
+            <div className="space-y-4">
               {filteredBills.length === 0 ? (
                 <div className="text-center py-12">
                   <IconAlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -639,9 +634,8 @@ export default function AuditDashboard() {
                   )}
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200">
+                <div className="space-y-4">
                   {filteredBills.map((bill, index) => {
-                    const isExpanded = expandedBillId === bill.id;
                     const canTakeAction = bill.audit === "Pending" || bill.audit === "Hold";
 
                     return (
@@ -650,183 +644,73 @@ export default function AuditDashboard() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className={cn(
-                          "p-4 hover:bg-gray-50 transition-colors",
-                          bill.audit === "Approved" && "bg-green-50",
-                          bill.audit === "Reject" && "bg-red-50",
-                          bill.audit === "Hold" && "bg-yellow-50"
-                        )}
                       >
-                        {/* Summary Row */}
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                              {bill.item_description || "No description"}
-                            </h3>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                        <BillCard bill={bill} showBankGuarantee={true} />
+                        
+                        {/* Audit Actions */}
+                        {canTakeAction && (
+                          <div className="mt-4 bg-white rounded-lg shadow p-4 border border-gray-200">
+                            <div className="space-y-3">
                               <div>
-                                <span className="font-medium">Employee:</span> {bill.employee_name}
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Add Audit Remark {bill.audit === "Hold" ? "(Update)" : "(Required for Hold/Reject)"}
+                                </label>
+                                <textarea
+                                  rows={2}
+                                  placeholder="Enter your audit remark here..."
+                                  value={remarks[bill.id] || ""}
+                                  onChange={(e) =>
+                                    setRemarks((prev) => ({
+                                      ...prev,
+                                      [bill.id]: e.target.value,
+                                    }))
+                                  }
+                                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
                               </div>
-                              <div>
-                                <span className="font-medium">Amount:</span> ₹{bill.po_value?.toLocaleString()}
-                              </div>
-                              <div>
-                                <span className="font-medium">Supplier:</span> {bill.supplier_name || "N/A"}
-                              </div>
-                              <div>
-                                <span className="font-medium">Category:</span> {bill.item_category || "N/A"}
+
+                              <div className="flex gap-3">
+                                <button
+                                  onClick={() => handleApprove(bill)}
+                                  className="flex items-center gap-1 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
+                                >
+                                  <IconCheck size={16} />
+                                  Approve & Send to Finance Admin
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleHold(bill)}
+                                  className="flex items-center gap-1 px-4 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition-colors"
+                                >
+                                  <IconClockPause size={16} />
+                                  Hold
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleReject(bill)}
+                                  className="flex items-center gap-1 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                >
+                                  <IconX size={16} />
+                                  Reject
+                                </button>
                               </div>
                             </div>
-                            {bill.location && (
-                              <div className="text-sm text-gray-600 mt-1">
-                                <span className="font-medium">Location:</span> {bill.location}
-                              </div>
-                            )}
                           </div>
-                          
-                          <div className="flex items-center gap-2 ml-4">
-                            <button
-                              onClick={() => {
-                                setSelectedBillDetails(bill);
-                                setShowDetailModal(true);
-                              }}
-                              className="p-2 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
-                              title="View Details"
-                            >
-                              <IconEye size={16} />
-                            </button>
-                            
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              bill.audit === "Approved" ? "bg-green-100 text-green-800" :
-                              bill.audit === "Reject" ? "bg-red-100 text-red-800" :
-                              bill.audit === "Hold" ? "bg-yellow-100 text-yellow-800" :
-                              "bg-orange-100 text-orange-800"
-                            }`}>
-                              {bill.audit || "Pending"}
-                            </span>
-                            
-                            <button
-                              onClick={() => setExpandedBillId(isExpanded ? null : bill.id)}
-                              className="px-3 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                            >
-                              {isExpanded ? "Hide" : "View"}
-                            </button>
+                        )}
+
+                        {/* Show actions result for approved/rejected bills */}
+                        {!canTakeAction && (
+                          <div className={`mt-4 p-3 rounded-lg ${
+                            bill.audit === "Approved" ? "bg-green-100 text-green-800" :
+                            "bg-red-100 text-red-800"
+                          }`}>
+                            <p className="font-medium">
+                              {bill.audit === "Approved" 
+                                ? "✅ Bill approved and sent to Finance Admin Department" 
+                                : "❌ Bill rejected by Audit Department"}
+                            </p>
                           </div>
-                        </div>
-
-                        {/* Expanded Details */}
-                        <AnimatePresence>
-                          {isExpanded && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.3 }}
-                              className="mt-4 space-y-4 border-t pt-4"
-                            >
-                              {/* Additional Details */}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                <div className="bg-gray-50 p-3 rounded">
-                                  <p className="font-medium text-gray-700 mb-1">Purchase Details</p>
-                                  <p><span className="font-medium">PO:</span> {bill.po_details || "N/A"}</p>
-                                  <p><span className="font-medium">Quantity:</span> {bill.qty || 0}</p>
-                                  <p><span className="font-medium">Quantity Issued:</span> {bill.qty_issued || 0}</p>
-                                  <p><span className="font-medium">Source of Fund:</span> {bill.source_of_fund || "N/A"}</p>
-                                  <p><span className="font-medium">Stock Entry:</span> {bill.stock_entry || "N/A"}</p>
-                                  <p><span className="font-medium">Submitted:</span> {
-                                    bill.created_at ? new Date(bill.created_at).toLocaleDateString() : "N/A"
-                                  }</p>
-                                </div>
-                                
-                                <div className="space-y-2">
-                                  <div className="bg-blue-50 p-3 rounded">
-                                    <p className="font-medium text-blue-800 mb-1">Additional Info</p>
-                                    <p><span className="font-medium">Bill Details:</span> {bill.bill_details || "N/A"}</p>
-                                    <p><span className="font-medium">Indenter:</span> {bill.indenter_name || "N/A"}</p>
-                                    <p><span className="font-medium">Supplier Address:</span> {bill.supplier_address || "N/A"}</p>
-                                  </div>
-                                  
-                                  {bill.remarks1 && (
-                                    <div className="bg-purple-50 p-3 rounded">
-                                      <p className="font-medium text-purple-800 mb-1">SNP Remark</p>
-                                      <p className="text-purple-700 text-sm">{bill.remarks1}</p>
-                                    </div>
-                                  )}
-                                  
-                                  {bill.remarks2 && (
-                                    <div className="bg-green-50 p-3 rounded">
-                                      <p className="font-medium text-green-800 mb-1">Your Audit Remark</p>
-                                      <p className="text-green-700 text-sm">{bill.remarks2}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Remark Input & Actions */}
-                              {canTakeAction && (
-                                <div className="space-y-3">
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                      Add Audit Remark {bill.audit === "Hold" ? "(Update)" : "(Required for Hold/Reject)"}
-                                    </label>
-                                    <textarea
-                                      rows={2}
-                                      placeholder="Enter your audit remark here..."
-                                      value={remarks[bill.id] || ""}
-                                      onChange={(e) =>
-                                        setRemarks((prev) => ({
-                                          ...prev,
-                                          [bill.id]: e.target.value,
-                                        }))
-                                      }
-                                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                  </div>
-
-                                  <div className="flex gap-3">
-                                    <button
-                                      onClick={() => handleApprove(bill)}
-                                      className="flex items-center gap-1 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
-                                    >
-                                      <IconCheck size={16} />
-                                      Approve & Send to Finance Admin
-                                    </button>
-                                    
-                                    <button
-                                      onClick={() => handleHold(bill)}
-                                      className="flex items-center gap-1 px-4 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition-colors"
-                                    >
-                                      <IconClockPause size={16} />
-                                      Hold
-                                    </button>
-                                    
-                                    <button
-                                      onClick={() => handleReject(bill)}
-                                      className="flex items-center gap-1 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                    >
-                                      <IconX size={16} />
-                                      Reject
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Show actions result for approved/rejected bills */}
-                              {!canTakeAction && (
-                                <div className={`p-3 rounded-lg ${
-                                  bill.audit === "Approved" ? "bg-green-100 text-green-800" :
-                                  "bg-red-100 text-red-800"
-                                }`}>
-                                  <p className="font-medium">
-                                    {bill.audit === "Approved" 
-                                      ? "✅ Bill approved and sent to Finance Admin Department" 
-                                      : "❌ Bill rejected by Audit Department"}
-                                  </p>
-                                </div>
-                              )}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                        )}
                       </motion.div>
                     );
                   })}

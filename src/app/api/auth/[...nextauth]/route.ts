@@ -1,7 +1,7 @@
 import NextAuth, { type AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import ldap from "ldapjs";
-import { getEmployeeTypeByUserId } from "../../supabase/index";
+import { getEmployeeDetailsByUserId } from "../../supabase/index";
 import { error } from "console";
 
 export const runtime = "nodejs";
@@ -91,11 +91,10 @@ export const authOptions: AuthOptions = {
 
         
 
-        if(credentials.username == "Audit" || credentials.username=="User" || credentials.username=="Bill-form" || credentials.username=="Finance Admin" ||credentials.username=="SNP" || credentials.username=="Bill-edit" ){
+        if(credentials.username == "Audit" || credentials.username=="User" || credentials.username=="Bill-form" || credentials.username=="Finance Admin" ||credentials.username=="SNP" || credentials.username=="Bill-edit" || credentials.username=="pda manager" || credentials.username=="E002"){
           if(credentials.password =="123"){
-            console.log('[NextAuth][authorize] fetching employee type for user', { uid: credentials.username});
-            const employee_type = await getEmployeeTypeByUserId(credentials.username);
-            console.log('[NextAuth][authorize] employee type resolved', { employee_type });
+            const { employee_type, employee_code } = await getEmployeeDetailsByUserId(credentials.username);
+            console.log('[NextAuth][authorize] employee details resolved', { employee_type, employee_code });
               const normalizedUser={
                 id:credentials.username,
                 username:credentials.username,
@@ -103,6 +102,7 @@ export const authOptions: AuthOptions = {
                 email:credentials.username+"@iitmandi.ac.in",
                 ou:"staff",
                 employee_type: employee_type || null,
+                employee_code: employee_code || null,
               }
               console.log('[NextAuth][authorize] returning normalized user', { normalizedUser })
               return normalizedUser;
@@ -126,10 +126,9 @@ export const authOptions: AuthOptions = {
             throw new Error("Invalid credentials");
           }
 
-          // Fetch employee_type from DB using userId
-          console.log('[NextAuth][authorize] fetching employee type for user', { uid: user.uid });
-          const employee_type = await getEmployeeTypeByUserId(user.uid);
-          console.log('[NextAuth][authorize] employee type resolved', { employee_type });
+          console.log('[NextAuth][authorize] fetching employee details for user', { uid: user.uid });
+          const { employee_type, employee_code } = await getEmployeeDetailsByUserId(user.uid);
+          console.log('[NextAuth][authorize] employee details resolved', { employee_type, employee_code });
 
           // Return normalized user object for NextAuth, including employee_type
           const normalizedUser = {
@@ -139,6 +138,7 @@ export const authOptions: AuthOptions = {
             email: user.mail,
             ou: user.ou,
             employee_type: employee_type || null,
+            employee_code: employee_code || null,
           };
           console.log('[NextAuth][authorize] returning normalized user', { normalizedUser });
           return normalizedUser;
@@ -163,6 +163,7 @@ export const authOptions: AuthOptions = {
         token.username = (user as any).username;
         token.ou = (user as any).ou;
         token.employee_type = (user as any).employee_type;
+        token.employee_code = (user as any).employee_code;
       }
       return token;
     },
@@ -174,6 +175,7 @@ export const authOptions: AuthOptions = {
         username: token.username as string,
         ou: token.ou as string,
         employee_type: token.employee_type as string,
+        employee_code: token.employee_code as string,
       };
       return session;
     },

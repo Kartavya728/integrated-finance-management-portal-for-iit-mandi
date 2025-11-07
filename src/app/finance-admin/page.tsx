@@ -22,6 +22,7 @@ import {
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import EditEmployeeForm from "@/components/EditEmployeeForm";
+import BillCard from "@/components/BillCard";
 
 // Allowed departments
 const DEPARTMENTS = [
@@ -125,6 +126,11 @@ interface Bill {
   remarks2?: string; // audit remark
   remarks3?: string; // other remark
   remarks4?: string; // additional remark
+  has_bank_guarantee?: boolean;
+  bank_guarantee_details?: string;
+  bank_guarantee_amount?: number;
+  date_of_installation?: string;
+  date_of_delivery?: string;
 }
 
 interface Employee {
@@ -465,7 +471,7 @@ export default function FinanceAdminDashboard() {
         return;
       }
 
-      const { data, error } = await (supabase as any)
+      const { error } = await (supabase as any)
         .from("employees")
         .insert({
           employee_name: newEmployee.employee_name,
@@ -473,23 +479,20 @@ export default function FinanceAdminDashboard() {
           employee_type: newEmployee.employee_type,
           department: newEmployee.department,
           employee_code: newEmployee.employee_code,
-        })
-        .select();
+        });
 
       if (error) throw error;
       
-      if (data) {
-        setEmployees((prev) => [...prev, ...data]);
-        setNewEmployee({
-          employee_name: "",
-          email: "",
-          employee_type: "Finance Employee",
-          department: "Finance and Accounts",
-          employee_code: "",
-        });
-        setShowAddEmployeeForm(false);
-        alert("Employee added successfully!");
-      }
+      setEmployees((prev) => [...prev, newEmployee as Employee]);
+      setNewEmployee({
+        employee_name: "",
+        email: "",
+        employee_type: "Finance Employee",
+        department: "Finance and Accounts",
+        employee_code: "",
+      });
+      setShowAddEmployeeForm(false);
+      alert("Employee added successfully!");
     } catch (err) {
       console.error("Error adding employee:", err);
       alert("Error adding employee");
@@ -689,24 +692,9 @@ export default function FinanceAdminDashboard() {
               {bills.slice(0, 5).length === 0 ? (
                 <p className="text-gray-500">No recent bills</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {bills.slice(0, 5).map((bill) => (
-                    <div key={bill.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                      <div>
-                        <p className="font-medium text-sm">{bill.item_description || "No description"}</p>
-                        <p className="text-xs text-gray-600">
-                          {bill.employee_name} • ₹{bill.po_value?.toLocaleString()}
-                        </p>
-                      </div>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        bill.finance_admin === "Approved" ? "bg-green-100 text-green-800" :
-                        bill.finance_admin === "Reject" ? "bg-red-100 text-red-800" :
-                        bill.finance_admin === "Hold" ? "bg-yellow-100 text-yellow-800" :
-                        "bg-blue-100 text-blue-800"
-                      }`}>
-                        {bill.finance_admin || "Pending"}
-                      </span>
-                    </div>
+                    <BillCard key={bill.id} bill={bill} showBankGuarantee={true} />
                   ))}
                 </div>
               )}
@@ -730,11 +718,9 @@ export default function FinanceAdminDashboard() {
                   .filter(bill => 
                     bill.finance_admin === "Pending" || 
                     bill.finance_admin === "Hold" || 
-                    // Legacy/edge: show Finance Admin status rows even if finance_admin is null
                     (bill.status === "Finance Admin" && (bill.finance_admin === null || bill.finance_admin === undefined))
                   )
-                  .map((bill) => {
-                    const isExpanded = expandedBill === bill.id;
+                  .map((bill, index) => {
                     const locked = bill.finance_admin === "Approved" || bill.finance_admin === "Reject";
 
                     return (
@@ -742,60 +728,14 @@ export default function FinanceAdminDashboard() {
                         key={bill.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={cn(
-                          "rounded-lg p-4 shadow cursor-pointer bg-white transition-all",
-                          bill.finance_admin === "Hold" 
-                            ? "border-2 border-yellow-500" 
-                            : "border border-gray-300 hover:border-blue-400"
-                        )}
-                        onClick={() => setExpandedBill(isExpanded ? null : bill.id)}
+                        transition={{ delay: index * 0.05 }}
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-800">
-                              {bill.item_description || "No description"}
-                            </h3>
-                            <p className="text-sm text-gray-600">
-                              Employee: {bill.employee_name} | Amount: ₹{bill.po_value?.toLocaleString()}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Supplier: {bill.supplier_name} | Category: {bill.item_category}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedBillDetails(bill);
-                                setShowDetailModal(true);
-                              }}
-                              className="p-2 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                            >
-                              <IconEye size={16} />
-                            </button>
-                            {(() => {
-                              const label = bill.finance_admin ?? (bill.status === "Finance Admin" ? "Pending" : "");
-                              const cls = label === "Hold"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-blue-100 text-blue-800";
-                              return (
-                                <span className={`px-2 py-1 rounded text-xs font-medium ${cls}`}>
-                                  {label}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                        </div>
+                        <BillCard bill={bill} showBankGuarantee={true} />
 
-                        <AnimatePresence>
-                          {isExpanded && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.3 }}
-                              className="mt-4 space-y-3 border-t pt-3"
-                            >
+                        {/* Finance Admin Actions */}
+                        {!locked && (
+                          <div className="mt-4 bg-white rounded-lg shadow p-4 border border-gray-200">
+                            <div className="space-y-3">
                               {/* Previous Remarks */}
                               {(bill.remarks1 || bill.remarks2) && (
                                 <div className="bg-gray-50 rounded p-3">
@@ -822,62 +762,48 @@ export default function FinanceAdminDashboard() {
                               )}
 
                               {/* Remark Input */}
-                              {!locked && (
-                                <div className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    placeholder="Enter your remark..."
-                                    value={remarks[bill.id] || ""}
-                                    onChange={(e) =>
-                                      setRemarks((prev) => ({
-                                        ...prev,
-                                        [bill.id]: e.target.value,
-                                      }))
-                                    }
-                                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                </div>
-                              )}
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Enter your remark..."
+                                  value={remarks[bill.id] || ""}
+                                  onChange={(e) =>
+                                    setRemarks((prev) => ({
+                                      ...prev,
+                                      [bill.id]: e.target.value,
+                                    }))
+                                  }
+                                  className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
 
                               {/* Action Buttons */}
-                              {!locked && (
-                                <div className="flex gap-3 pt-2">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleApprove(bill);
-                                    }}
-                                    className="flex items-center gap-1 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
-                                  >
-                                    <IconCheck size={16} />
-                                    Approve
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleHold(bill);
-                                    }}
-                                    className="flex items-center gap-1 px-4 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition-colors"
-                                  >
-                                    <IconClockPause size={16} />
-                                    Hold
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleReject(bill);
-                                    }}
-                                    className="flex items-center gap-1 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
-                                  >
-                                    <IconX size={16} />
-                                    Reject
-                                  </button>
-                                </div>
-                              )}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                              <div className="flex gap-3 pt-2">
+                                <button
+                                  onClick={() => handleApprove(bill)}
+                                  className="flex items-center gap-1 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
+                                >
+                                  <IconCheck size={16} />
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => handleHold(bill)}
+                                  className="flex items-center gap-1 px-4 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition-colors"
+                                >
+                                  <IconClockPause size={16} />
+                                  Hold
+                                </button>
+                                <button
+                                  onClick={() => handleReject(bill)}
+                                  className="flex items-center gap-1 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                                >
+                                  <IconX size={16} />
+                                  Reject
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </motion.div>
                     );
                   })}
@@ -1133,107 +1059,102 @@ export default function FinanceAdminDashboard() {
       <AnimatePresence>
         {showAddEmployeeForm && (
           <motion.div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-gray-900 bg-opacity-75 flex justify-center items-center z-50"
           >
             <motion.div
-              className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full mx-4"
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
+              initial={{ y: -50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -50, opacity: 0 }}
+              className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md"
             >
-              <h3 className="text-lg font-semibold mb-4">Add New Employee</h3>
-              
-              <div className="space-y-4">
+              <h2 className="text-3xl font-bold mb-6 text-gray-800">Add New Employee</h2>
+              <form onSubmit={handleAddEmployee} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Full Name *</label>
+                  <label htmlFor="employee_name" className="block text-sm font-medium text-gray-700">Name</label>
                   <input
                     type="text"
+                    id="employee_name"
+                    name="employee_name"
                     value={newEmployee.employee_name}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, employee_name: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter full name"
+                    onChange={handleNewEmployeeChange}
+                    className="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    required
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium mb-1">Email *</label>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
                   <input
                     type="email"
+                    id="email"
+                    name="email"
                     value={newEmployee.email}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter email address"
+                    onChange={handleNewEmployeeChange}
+                    className="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    required
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium mb-1">Employee Code *</label>
-                  <input
-                    type="text"
-                    value={newEmployee.employee_code}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, employee_code: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter employee code"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Employee Type</label>
+                  <label htmlFor="employee_type" className="block text-sm font-medium text-gray-700">Employee Type</label>
                   <select
+                    id="employee_type"
+                    name="employee_type"
                     value={newEmployee.employee_type}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, employee_type: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    onChange={handleNewEmployeeChange}
+                    className="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   >
-                    <option value="Finance Admin">Finance Admin</option>
                     <option value="Finance Employee">Finance Employee</option>
-                    <option value="Audit">Audit</option>
-                    <option value="Bill Employee">Bill Employee</option>
+                    <option value="faculty">faculty</option>
+                    <option value="staff">staff</option>
                     <option value="Student Purchase">Student Purchase</option>
                     <option value="bill_employee_edit">bill_employee_edit</option>
                     <option value="bill_employee_fill">bill_employee_fill</option>
+                    <option value="pda-manager">pda-manager</option>
                   </select>
                 </div>
-                
                 <div>
-                  <label className="block text-sm font-medium mb-1">Department</label>
+                  <label htmlFor="department" className="block text-sm font-medium text-gray-700">Department</label>
                   <select
+                    id="department"
+                    name="department"
                     value={newEmployee.department}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, department: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    onChange={handleNewEmployeeChange}
+                    className="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                   >
-                    {DEPARTMENTS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
+                    {DEPARTMENTS.map((dept) => (
+                      <option key={dept} value={dept}>{dept}</option>
                     ))}
                   </select>
                 </div>
-              </div>
-
-              <div className="flex gap-2 mt-6">
-                <button
-                  onClick={handleAddEmployee}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  Add Employee
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAddEmployeeForm(false);
-                    setNewEmployee({
-                      employee_name: "",
-                      email: "",
-                      employee_type: "Finance Employee",
-                      department: "Finance and Accounts",
-                      employee_code: "",
-                    });
-                  }}
-                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-              </div>
+                <div>
+                  <label htmlFor="employee_code" className="block text-sm font-medium text-gray-700">Employee Code</label>
+                  <input
+                    type="text"
+                    id="employee_code"
+                    name="employee_code"
+                    value={newEmployee.employee_code}
+                    onChange={handleNewEmployeeChange}
+                    className="mt-1 block w-full px-4 py-3 bg-gray-50 aorder border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+                <div className="flex justify-end pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddEmployeeForm(false)}
+                    className="mr-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Add Employee
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}

@@ -7,20 +7,23 @@ const supabase = sharedSupabase;
 
 export default supabase;
 
-export async function getEmployeeTypeByUserId(userId: string): Promise<string> {
-  console.log('[getEmployeeTypeByUserId] fetching employee type', { userId });
+export async function getEmployeeDetailsByUserId(userId: string): Promise<{ employee_type: string; employee_code: string | null }> {
+  console.log('[getEmployeeDetailsByUserId] fetching employee details', { userId });
   const { data, error } = await supabase
-    .from('employees') 
-    .select('employee_type')
+    .from('employees')
+    .select('employee_type, employee_code')
     .eq('id', userId)
     .single();
 
-  console.log('[getEmployeeTypeByUserId] query result', { error, data });
+  console.log('[getEmployeeDetailsByUserId] query result', { error, data });
 
-  if (error || !data || !data.employee_type) {
-    console.warn('[getEmployeeTypeByUserId] employee not found or missing type, defaulting to "User"', { userId, error });
-    return 'User';
+  if (error || !data) {
+    console.warn('[getEmployeeDetailsByUserId] employee not found, defaulting to "User"', { userId, error });
+    return { employee_type: 'User', employee_code: null };
   }
 
-  return data.employee_type;
+  return {
+    employee_type: data.employee_type || 'User',
+    employee_code: data.employee_code,
+  };
 }

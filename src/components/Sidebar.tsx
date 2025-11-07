@@ -49,6 +49,11 @@ const getNavigationItems = (
       { title: "Employees", url: "/employees", icon: Users },
       { title: "PDA Balance", url: "/pda-balance", icon: IndianRupee },
     ];
+  } else if (employeeType === "pda-manager") {
+    return [
+      ...baseItems,
+      { title: "PDA Manager", url: "/pda-manager", icon: IndianRupee },
+    ];
   } else if (employeeType === "Finance Employee") {
     return [
       ...baseItems,
