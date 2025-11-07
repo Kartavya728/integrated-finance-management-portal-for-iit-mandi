@@ -146,6 +146,7 @@ export interface Database {
           balance: number | null
           updated_at: string | null
           department: string | null
+          email: string | null; 
         }
         Insert: {
           id?: string
@@ -153,6 +154,7 @@ export interface Database {
           balance?: number | null
           updated_at?: string | null
           department?: string | null
+          email: string; 
         }
         Update: {
           id?: string
@@ -160,6 +162,7 @@ export interface Database {
           balance?: number | null
           updated_at?: string | null
           department?: string | null
+          email: string;
         }
       }
     }

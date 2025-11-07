@@ -4,7 +4,7 @@ export async function getUserRole(userId: string) {
   const { data, error } = await supabase
     .from("employees")
     .select("employee_type")
-    .eq("id", userId)
+    .eq("employee_code", userId)
     .single();
 
   if (error) throw error;

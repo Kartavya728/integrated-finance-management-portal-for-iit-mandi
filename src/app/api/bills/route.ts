@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     // 1. Find employee by username
     const { data: employee, error: empError } = await supabase
       .from("employees")
-      .select("id")
+      .select("employee_code")
       .eq("username", session.user.username)
       .single();
 
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         supplier_name,
         po_value,
         status: "Pending",
-        employee_id: employee.id, // ✅ Correct foreign key usage
+        employee_id: employee.employee_code,
       },
     ]);
 

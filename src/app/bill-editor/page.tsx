@@ -24,7 +24,7 @@ export default function BillEditorPage() {
         const { data: emp, error: empErr } = await supabase
           .from("employees")
           .select("department")
-          .eq("id", userId)
+          .eq("employee_code", userId)
           .single();
         if (empErr) throw empErr;
         const dept = (emp as { department: string | null } | null)?.department || null;

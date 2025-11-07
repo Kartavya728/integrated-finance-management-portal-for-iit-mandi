@@ -33,7 +33,7 @@ export default function EmployeeDashboard() {
         const { data: emp, error: empErr } = await supabase
           .from("employees")
           .select("department")
-          .eq("id", userId)
+          .eq("employee_code", userId)
           .single();
 
         if (empErr) throw empErr;

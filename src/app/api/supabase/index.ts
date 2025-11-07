@@ -12,7 +12,7 @@ export async function getEmployeeDetailsByUserId(userId: string): Promise<{ empl
   const { data, error } = await supabase
     .from('employees')
     .select('employee_type, employee_code')
-    .eq('id', userId)
+    .eq('employee_code', userId)
     .single();
 
   console.log('[getEmployeeDetailsByUserId] query result', { error, data });

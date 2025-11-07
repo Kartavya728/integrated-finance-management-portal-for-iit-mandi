@@ -29,7 +29,7 @@ export const employeesService = {
           updated_at
         )
       `)
-      .eq('id', id)
+      .eq('employee_code', id)
       .single()
   },
 
@@ -68,7 +68,7 @@ export const employeesService = {
     return await supabase
       .from('employees')
       .update(updates)
-      .eq('id', id)
+      .eq('employee_code', id)
       .select()
       .single()
   },
@@ -78,7 +78,7 @@ export const employeesService = {
     return await supabase
       .from('employees')
       .delete()
-      .eq('id', id)
+      .eq('employee_code', id)
   },
 
   // Get employees by type
@@ -103,7 +103,7 @@ export const employeesService = {
   async checkEmployeeCodeExists(employeeCode: string, excludeId?: string): Promise<{ exists: boolean; error: any }> {
     let query = supabase
       .from('employees')
-      .select('id')
+      .select('employee_code')
       .eq('employee_code', employeeCode)
 
     if (excludeId) {
@@ -121,7 +121,7 @@ export const employeesService = {
   async checkEmailExists(email: string, excludeId?: string): Promise<{ exists: boolean; error: any }> {
     let query = supabase
       .from('employees')
-      .select('id')
+      .select('employee_code')
       .eq('email', email)
 
     if (excludeId) {
