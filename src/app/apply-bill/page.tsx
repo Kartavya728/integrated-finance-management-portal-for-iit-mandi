@@ -128,7 +128,7 @@ export default function EmployeeDashboard() {
                   activePage === "history" ? "bg-gray-200 font-semibold" : "hover:bg-gray-100"
                 }`}
               >
-                {open && "Bill History"}
+                {open && "Rejected Bills"}
               </button>
 
               {/* ✅ New Approved Bills Sidebar Option */}

@@ -1,9 +1,90 @@
 "use client";
 import React, { useState } from "react";
 
+// allowed departments
+const DEPARTMENTS = [
+  "Staff Recruitment Section",
+  "Dean Infrastructure (I&S)/Land Acquisition",
+  "Dean Resource Generation & Alumni Relations",
+  "Central Dak Section",
+  "Health Center",
+  "School of Computing & Electrical Engineering",
+  "School of Chemical Sciences",
+  "School of Physical Sciences",
+  "School of Mathematical & Statistical Sciences",
+  "School of Biosciences & Bio Engineering",
+  "School of Mechanical & Materials Engineering",
+  "School of Civil & Environmental Engineering",
+  "School of Humanities & Social Sciences",
+  "School of Management",
+  "Advanced Materials Research Center (AMRC)",
+  "Centre of Artificial Intelligence and Robotics (CAIR)",
+  "Center for Quantum Science and Technologies (CQST)",
+  "Centre for Design & Fabrication of Electronic Devices (C4DFED)",
+  "Center for Human-Computer Interaction (CHCI)",
+  "Center for Climate Change and Disaster Management (C3DAR)",
+  "IIT Mandi i-Hub & HCI",
+  "IKSMHA Center",
+  "Centre for Continuing Education (CCE)",
+  "JEE CELL",
+  "JAM",
+  "GATE",
+  "Office of Chief Warden",
+  "Parashar Hostel",
+  "Chandertaal Hostel",
+  "Suvalsar Hostel",
+  "Nako Hostel",
+  "Dashir Hostel",
+  "Beas Kund Hostel",
+  "Manimahesh Hostel",
+  "Suraj Taal Hostel",
+  "Gauri Kund Hostel",
+  "Central Mess",
+  "Sports",
+  "NSS",
+  "Guidance & Counselling Cell",
+  "Construction & Maintainance Cell",
+  "Transportation",
+  "Guest House",
+  "Housekeeping Services & Waste Management",
+  "Creche",
+  "Security Unit",
+  "Common Rooms",
+  "Career & Placement Cell",
+  "IIT Mandi Catalyst",
+  "Recreation Center",
+  "CPWD",
+  "Banks",
+  "IPDC",
+  "IR",
+  "Mind Tree School",
+  "Renuka Hostel",
+  "Rewalsar",
+  "Director Office",
+  "Deans",
+  "Associate Deans",
+  "Registrar Office",
+  "Administration and Establishment Section",
+  "Faculty Establishment and Recruitment",
+  "Finance and Accounts",
+  "Store and Purchase Section",
+  "Rajbhasa Section",
+  "Ranking Cell (RC)",
+  "Media Cell",
+  "Academics Section",
+  "Academic Affairs",
+  "Research Affairs",
+  "Legal Section",
+  "Internal Audit",
+  "Central Library",
+  "DIGITAL AND COMPUTING SERVICES",
+  "Dean (SRIC & IR ) Office",
+  "Dean (Students) Office",
+];
+
 interface Employee {
   id: string;
-  employee_name: string;
+  email: string;         // Add email
   employee_type: string;
   department: string;
   employee_code: string;
@@ -20,8 +101,25 @@ const EditEmployeeForm: React.FC<EditEmployeeFormProps> = ({
   onSave,
   onCancel,
 }) => {
-  const [formData, setFormData] = useState<Employee>(employee);
+  const [formData, setFormData] = useState<Employee>({
+    ...employee,
+    email: employee.email ?? "",
+    employee_type: employee.employee_type ?? "",
+    department: employee.department ?? "",
+    employee_code: employee.employee_code ?? "",
+  });
   const [isSaving, setIsSaving] = useState(false);
+
+  // keep form in sync if parent passes a new employee prop
+  React.useEffect(() => {
+    setFormData({
+      ...employee,
+      email: employee.email ?? "",
+      employee_type: employee.employee_type ?? "",
+      department: employee.department ?? "",
+      employee_code: employee.employee_code ?? "",
+    });
+  }, [employee]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -46,12 +144,12 @@ const EditEmployeeForm: React.FC<EditEmployeeFormProps> = ({
         <h2 className="text-3xl font-bold mb-6 text-gray-800">Edit Employee</h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="employee_name" className="block text-sm font-medium text-gray-700">Name</label>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
             <input
-              type="text"
-              id="employee_name"
-              name="employee_name"
-              value={formData.employee_name}
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
               onChange={handleChange}
               className="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
@@ -83,12 +181,11 @@ const EditEmployeeForm: React.FC<EditEmployeeFormProps> = ({
               onChange={handleChange}
               className="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             >
-              <option value="CSE">CSE</option>
-              <option value="EE">EE</option>
-              <option value="ME">ME</option>
-              <option value="CE">CE</option>
-              <option value="BioX">BioX</option>
-              <option value="other">other</option>
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
             </select>
           </div>
           <div>

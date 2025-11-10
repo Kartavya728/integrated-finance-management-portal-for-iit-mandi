@@ -98,7 +98,7 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
 
   return (
     <div className="w-full">
-      <h2 className="text-2xl font-semibold mb-6">All Bills History</h2>
+      <h2 className="text-2xl font-semibold mb-6">Rejected Bills</h2>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 border rounded bg-white shadow-sm text-sm">
           <thead className="bg-gray-100">

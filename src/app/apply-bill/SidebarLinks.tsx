@@ -22,7 +22,7 @@ const SidebarLinks: React.FC<SidebarLinksProps> = ({
       key: "upload"
     },
     {
-      label: "Bills History",
+      label: "Rejected Bills",
       icon: <IconHistory className="h-5 w-5 shrink-0 text-indigo-600" />,
       onClick: () => setActivePage("history"),
       key: "history"

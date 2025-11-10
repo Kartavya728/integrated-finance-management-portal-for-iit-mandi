@@ -24,7 +24,7 @@ export interface BillUpdateEmailData {
 
 export function getBillUpdateEmailContent(emailData: BillUpdateEmailData) {
   const { billId, employeeEmail, employeeName, recentRemark, previousRemarks, billDetails } = emailData;
-  const subject = `Update on Bill ID: ${billId}`;
+  const subject = `Update on Bill`;
   let previousRemarksHtml = '';
   if (previousRemarks.length > 0) {
     previousRemarksHtml = '<div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">';
