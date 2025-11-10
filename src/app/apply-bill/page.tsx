@@ -33,8 +33,15 @@ export default function EmployeeDashboard() {
         const { data: emp, error: empErr } = await supabase
           .from("employees")
           .select("department")
-          .eq("employee_code", userId)
-          .single();
+          .or(
+            [
+              `employee_code.eq.${userId}`,
+              `employee_code.like.%${userId}%`,
+              `employee_code.like.%${userId}`,
+              `employee_code.like.${userId}%`
+            ].join(",")
+        )
+        .maybeSingle();
 
         if (empErr) throw empErr;
         const dept = emp?.department || null;

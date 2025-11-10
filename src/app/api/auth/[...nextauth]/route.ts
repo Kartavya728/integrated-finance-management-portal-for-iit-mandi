@@ -102,7 +102,7 @@ export const authOptions: AuthOptions = {
                 email:credentials.username+"@iitmandi.ac.in",
                 ou:"staff",
                 employee_type: employee_type || null,
-                employee_code: employee_code || null,
+                employee_code: credentials.username   || null,
               }
               console.log('[NextAuth][authorize] returning normalized user', { normalizedUser })
               return normalizedUser;
@@ -138,7 +138,7 @@ export const authOptions: AuthOptions = {
             email: user.mail,
             ou: user.ou,
             employee_type: employee_type || null,
-            employee_code: employee_code || null,
+            employee_code: user.uid,
           };
           console.log('[NextAuth][authorize] returning normalized user', { normalizedUser });
           return normalizedUser;
@@ -163,7 +163,7 @@ export const authOptions: AuthOptions = {
         token.username = (user as any).username;
         token.ou = (user as any).ou;
         token.employee_type = (user as any).employee_type;
-        token.employee_code = (user as any).employee_code;
+        token.employee_code = token.id;
       }
       return token;
     },

@@ -21,12 +21,12 @@ export default function PdaManagerPage() {
   const { data: session } = useSession();
   const router = useRouter();
 
-  useEffect(() => {
+/*  useEffect(() => {
     if (session?.user?.role !== "pda-manager") {
       router.push("/login");
     }
-  }, [session, router]);
-
+  }, [session, router]);*/
+  
   useEffect(() => {
     const fetchPdaBalances = async () => {
       const { data, error } = await supabase.from("pda_balances").select("*");

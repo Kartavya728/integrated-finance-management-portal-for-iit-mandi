@@ -7,6 +7,7 @@ declare module "next-auth" {
       username: string;
       ou: string;
       employee_type?: string | null;
+      employee_code?: string | null;
     } & DefaultSession["user"];
   }
 

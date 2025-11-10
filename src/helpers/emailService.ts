@@ -44,7 +44,15 @@ export const sendBillRemarkNotification = async (remarkData: BillRemarkData) => 
     const { data: employeeData, error: employeeError } = await (supabase as any)
       .from('pda_balances')
       .select('email')
-      .eq('employee_id', billData.employee_id)
+      
+      .or(
+        [
+          `employee_id.eq.${billData.employee_id}`,
+          `employee_id.like.%${billData.employee_id}%`,
+          `employee_id.like.%${billData.employee_id}`,
+          `employee_id.like.${billData.employee_id}%`
+        ].join(",")
+      )
       .single();
 
     if (employeeError || !employeeData?.email) {
