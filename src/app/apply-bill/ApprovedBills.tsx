@@ -22,18 +22,28 @@ const ApprovedBills: React.FC<ApprovedBillsProps> = ({ department }) => {
     const fetchApprovedBills = async () => {
       setLoading(true);
       try {
-        // Fetch only bills where all three departments have approved
-        const { data, error } = await supabase
+        // get rows where any of the three is Approved (server-side reduces rows)
+        const { data, error, count } = await supabase
           .from("bills")
-          .select("*")
+          .select("*", { count: "exact" })
           .eq("employee_department", department)
-          .eq("snp", "Approved")
-          .eq("audit", "Approved")
-          .eq("finance_admin", "Approved")
-          .order("created_at", { ascending: false });
+          .or("snp.eq.Approved,audit.eq.Approved,finance_admin.eq.Approved")
+          .order("created_at", { ascending: false })
+          .range(0, 9999);
 
         if (error) throw error;
-        setBills(data || []);
+
+        // allow cases where at least one is "Approved" and the others are NULL (not the string "N/A")
+        const filtered = (data || []).filter((b: Bill) => {
+          const statuses = [b.snp, b.audit, b.finance_admin];
+          const approvedCount = statuses.filter((s) => s === "Approved").length;
+          // allow only Approved or NULL (SQL NULL -> JS null)
+          const othersAreAllowed = statuses.every((s) => s === "Approved" || s == null);
+          return approvedCount >= 1 && othersAreAllowed;
+        });
+
+        console.log("ApprovedBills: supabase count =", count, "returned =", (data || []).length, "filtered =", filtered.length);
+        setBills(filtered);
       } catch (err) {
         console.error("Error fetching approved bills:", err);
       } finally {
@@ -44,7 +54,7 @@ const ApprovedBills: React.FC<ApprovedBillsProps> = ({ department }) => {
     fetchApprovedBills();
   }, [department]);
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null | undefined) => {
     switch (status) {
       case "Pending":
         return "text-yellow-600 bg-yellow-100";
@@ -128,20 +138,22 @@ const ApprovedBills: React.FC<ApprovedBillsProps> = ({ department }) => {
               <tr key={bill.id} className="hover:bg-gray-50">
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{bill.employee_id}</td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{bill.employee_name}</td>
-                <td className="px-3 py-4 text-sm text-gray-900 max-w-xs truncate">{bill.po_details || "N/A"}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">₹ {bill.po_value?.toLocaleString()}</td>
-                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{bill.item_category || "—"}</td>
+                <td className="px-3 py-4 text-sm text-gray-900 max-w-xs truncate">{bill.po_details ?? "—"}</td>
+                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {bill.po_value != null ? `₹ ${bill.po_value.toLocaleString()}` : "—"}
+                </td>
+                <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">{bill.item_category ?? "—"}</td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(bill.snp)}`}>{bill.snp}</span>
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(bill.snp)}`}>{bill.snp ?? "—"}</span>
                 </td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(bill.audit)}`}>{bill.audit}</span>
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(bill.audit)}`}>{bill.audit ?? "—"}</span>
                 </td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(bill.finance_admin)}`}>{bill.finance_admin}</span>
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(bill.finance_admin)}`}>{bill.finance_admin ?? "—"}</span>
                 </td>
                 <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {new Date(bill.created_at).toLocaleDateString()}
+                  {bill.created_at ? new Date(bill.created_at).toLocaleDateString() : "—"}
                 </td>
                 <td className="px-3 py-4 whitespace-nowrap text-center text-sm">
                   <div id={`qr-${bill.id}`} className="flex flex-col items-center gap-2">

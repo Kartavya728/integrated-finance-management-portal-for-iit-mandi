@@ -51,8 +51,17 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) 
     let { data, error }: { data: PDABalance | null; error: any } = await supabase
       .from("pda_balances")
       .select("employee_id,balance,department")
-      .eq("employee_id", id)
-      .maybeSingle();
+      
+      .or(
+            [
+              `employee_id.eq.${id}`,
+              `employee_id.like.%${id}%`,
+              `employee_id.like.%${id}`,
+              `employee_id.like.${id}%`
+            ].join(",")
+        )
+        .limit(1)        // ✅ safer than .single()
+        .maybeSingle();
     if (data && !error) return data.balance as number | null;
     
     // If exact match fails, try to find by comparing normalized values
