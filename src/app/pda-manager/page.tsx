@@ -315,17 +315,7 @@ export default function PdaManagerPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <input
-                value={search}
-                onChange={(e) => {
-                  setPage(1);
-                  setSearch(e.target.value);
-                }}
-                placeholder="Search by ID, department, email"
-                className="w-64 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
+            
             <button
               onClick={() => setIsAdding(true)}
               className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"

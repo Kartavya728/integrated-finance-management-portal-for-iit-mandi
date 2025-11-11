@@ -114,6 +114,14 @@ export default function UserPage() {
           .from("bills")
           .select("*")
           .eq("employee_id", username)
+          .or(
+            [
+              `employee_id.eq.${username}`,
+              `employee_id.like.%${username}%`,
+              `employee_id.like.%${username}`,
+              `employee_id.like.${username}%`
+            ].join(",")
+          )
           .order("created_at", { ascending: false });
 
         if (billsData) {

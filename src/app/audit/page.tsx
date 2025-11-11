@@ -78,29 +78,29 @@ export default function AuditDashboard() {
   const [showFilters, setShowFilters] = useState(false);
 
   // Fetch bills - only show bills where audit is not NULL and status is Audit
-  useEffect(() => {
-    const fetchBills = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from("bills")
-          .select("*")
-          .eq("status", "Audit") // Only bills at Audit stage
-          .not("audit", "is", null) // Exclude bills where audit is NULL
-          .order("created_at", { ascending: false });
+  // Audit Dashboard fetch logic - MODIFIED
+useEffect(() => {
+  const fetchBills = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("bills")
+        .select("*")
+        .not("audit", "is", null) // Fetch all bills where Audit has recorded an action/status
+        .order("created_at", { ascending: false });
 
-        if (error) throw error;
-        setBills(data || []);
-        setFilteredBills(data || []);
-      } catch (err) {
-        console.error("Error fetching bills:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      if (error) throw error;
+      setBills(data || []);
+      setFilteredBills(data || []);
+    } catch (err) {
+      console.error("Error fetching bills:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchBills();
-  }, []);
+  fetchBills();
+}, []); // Keep dependency array
 
   // Apply filters whenever search criteria change
   useEffect(() => {
