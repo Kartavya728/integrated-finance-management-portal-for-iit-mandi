@@ -37,7 +37,7 @@ export default function LoginPage() {
             "Finance Employee": "/finance-employee",
             "Audit": "/audit",
             "Student Purchase": "/student-purchase",
-            
+            "pda-manager": "/pda-manager",
             "bill_employee_fill": "/apply-bill",
             "bill_employee_edit": "/bill-editor",
             

@@ -56,7 +56,7 @@ interface Bill {
 }
 
 export default function AuditDashboard() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [open, setOpen] = useState(false);
   const [bills, setBills] = useState<Bill[]>([]);
   const [filteredBills, setFilteredBills] = useState<Bill[]>([]);
@@ -77,9 +77,30 @@ export default function AuditDashboard() {
   const [locationFilter, setLocationFilter] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
+  // Access control: Only allow users with employee_type === "Audit"
+  useEffect(() => {
+    if (status === "loading") return;
+
+    if (status === "unauthenticated") {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return;
+    }
+
+    if (session && (session as any).user?.employee_type !== "Audit") {
+      alert("You have no access to this page.");
+      signOut({ callbackUrl: "/login" });
+    }
+  }, [status, session]);
+
   // Fetch bills - only show bills where audit is not NULL and status is Audit
   // Audit Dashboard fetch logic - MODIFIED
 useEffect(() => {
+  // Only fetch when authenticated and user is Audit
+  if (status !== "authenticated" || (session as any)?.user?.employee_type !== "Audit") {
+    return;
+  }
   const fetchBills = async () => {
     setLoading(true);
     try {
@@ -100,7 +121,7 @@ useEffect(() => {
   };
 
   fetchBills();
-}, []); // Keep dependency array
+}, [status, session]); // Fetch when authorized
 
   // Apply filters whenever search criteria change
   useEffect(() => {
@@ -370,6 +391,11 @@ useEffect(() => {
       onClick: () => setActiveFilter("Reject"),
     },
   ];
+
+  // Block render for non-authorized users after hooks have initialized
+  if (status !== "authenticated" || (session as any)?.user?.employee_type !== "Audit") {
+    return null;
+  }
 
   return (
     <div className="flex w-full h-screen bg-white shadow-lg">
