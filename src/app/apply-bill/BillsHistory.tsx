@@ -34,30 +34,83 @@ const BillsHistory: React.FC<BillsHistoryProps> = ({
 
   const handleNoted = async (billId: string) => {
     if (!allowDelete || !onBillNoted) return;
-    const confirmed = window.confirm("Mark this bill as noted? It will be permanently removed from your view.");
+  
+    const confirmed = window.confirm(
+      "Mark this bill as noted? The bill will be removed and the amount will be restored to the employee's PDA balance."
+    );
     if (!confirmed) return;
+  
     try {
       setNotingId(billId);
-      // Update the bill in database to mark as noted
-      const { error } = await (supabase.from("bills") as any)
-        .update({ noted: true })
-        .eq("id", billId);
-      
-      if (error) {
-        console.error("Error updating bill as noted:", error);
-        alert("Error marking bill as noted");
+  
+      // ✅ 1️⃣ Fetch bill details (employee_id & po_value)
+      const { data: billData, error: billError } = await (supabase.from("bills") as any)
+        .select("employee_id, po_value")
+        .eq("id", billId)
+        .maybeSingle();
+  
+      if (billError || !billData) {
+        console.error("Error fetching bill details:", billError);
+        alert("Could not find bill details!");
         return;
       }
-      
-      // Call the callback to remove the bill from the current view
+  
+      const { employee_id, po_value } = billData;
+      if (!employee_id || !po_value) {
+        alert("Invalid bill data: missing employee ID or amount.");
+        return;
+      }
+  
+      const billValue = parseFloat(po_value);
+  
+      // ✅ 2️⃣ Fetch current PDA balance
+      const { data: balanceData, error: balanceError } = await (supabase.from("pda_balances") as any)
+        .select("id, balance")
+        .eq("employee_id", employee_id)
+        .maybeSingle();
+  
+      if (balanceError || !balanceData) {
+        console.error("Error fetching PDA balance:", balanceError);
+        alert("Could not fetch current PDA balance.");
+        return;
+      }
+  
+      const currentBalance = parseFloat(balanceData.balance || 0);
+      const newBalance = currentBalance + billValue;
+  
+      // ✅ 3️⃣ Update PDA balance
+      const { error: updateBalanceErr } = await (supabase.from("pda_balances") as any)
+        .update({ balance: newBalance })
+        .eq("employee_id", employee_id);
+  
+      if (updateBalanceErr) {
+        console.error("Error updating PDA balance:", updateBalanceErr);
+        alert("Failed to update PDA balance.");
+        return;
+      }
+  
+      // ✅ 4️⃣ Mark bill as noted
+      const { error: notedErr } = await (supabase.from("bills") as any)
+        .update({ noted: true })
+        .eq("id", billId);
+  
+      if (notedErr) {
+        console.error("Error marking bill as noted:", notedErr);
+        alert("Error marking bill as noted.");
+        return;
+      }
+  
+      // ✅ 5️⃣ Notify success + refresh UI
+      alert("Bill marked as noted and PDA balance restored successfully!");
       onBillNoted(billId);
     } catch (err) {
       console.error("Error noting bill:", err);
-      alert("Error noting bill");
+      alert("Unexpected error while marking bill as noted.");
     } finally {
       setNotingId(null);
     }
   };
+  
 
   const getStatusColor = (status: string) => {
     switch (status) {

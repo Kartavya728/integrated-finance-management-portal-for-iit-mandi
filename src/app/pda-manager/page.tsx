@@ -3,8 +3,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { useSession } from "next-auth/react";
+import { useSession,signOut } from "next-auth/react";
 import SidebarLayout from "@/components/Sidebar";
+
 
 const DEPARTMENTS = [
   "Staff Recruitment Section",
@@ -96,7 +97,7 @@ type PdaBalance = {
 };
 
 export default function PdaManagerPage() {
-  const { data: session } = useSession();
+  const { data: session,status } = useSession();
 
   const [rows, setRows] = useState<PdaBalance[]>([]);
   const [total, setTotal] = useState(0);
@@ -117,6 +118,24 @@ export default function PdaManagerPage() {
 
   const pageFrom = useMemo(() => (page - 1) * pageSize, [page, pageSize]);
   const pageTo = useMemo(() => pageFrom + pageSize - 1, [pageFrom, pageSize]);
+
+
+   useEffect(() => {
+      if (status === "loading") return;
+  
+      if (status === "unauthenticated") {
+        if (typeof window !== "undefined") {
+          window.location.href = "/login";
+        }
+        return;
+      }
+  
+      if (session && (session as any).user?.employee_type !== "pda-manager") {
+        alert("You have no access to this page.");
+        signOut({ callbackUrl: "/login" });
+      }
+    }, [status, session]);
+  
 
   const fetchPaged = async () => {
     setLoading(true);

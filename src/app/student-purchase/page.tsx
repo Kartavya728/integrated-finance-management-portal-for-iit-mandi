@@ -45,7 +45,7 @@ interface Bill {
 }
 
 export default function SnpDashboard() {
-  const { data: session } = useSession();
+  const { data: session,status } = useSession();
   const [open, setOpen] = useState(false);
   const [bills, setBills] = useState<Bill[]>([]);
   const [filteredBills, setFilteredBills] = useState<Bill[]>([]);
@@ -58,6 +58,7 @@ export default function SnpDashboard() {
   const [jsonViewId, setJsonViewId] = useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedBillDetails, setSelectedBillDetails] = useState<Bill | null>(null);
+  
 
   // Bank guarantee state variables
   const [bankGuaranteeData, setBankGuaranteeData] = useState<Record<string, {
@@ -75,7 +76,23 @@ export default function SnpDashboard() {
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({ start: "", end: "" });
   const [locationFilter, setLocationFilter] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  
+// Access control: Only allow users with employee_type === "Student Purchase"
+  useEffect(() => {
+    if (status === "loading") return;
 
+    if (status === "unauthenticated") {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return;
+    }
+
+    if (session && (session as any).user?.employee_type !== "Student Purchase") {
+      alert("You have no access to this page.");
+      signOut({ callbackUrl: "/login" });
+    }
+  }, [status, session]);
   // fetch bills
   useEffect(() => {
     const fetchBills = async () => {

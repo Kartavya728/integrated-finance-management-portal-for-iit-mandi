@@ -9,6 +9,14 @@ interface UploadBillProps {
   onBillSubmitted: () => void;
   department?: string | null;
 }
+interface PDABalance {
+  id?: string;
+  employee_id: string | null;
+  balance: number | null;
+  updated_at?: string | null;
+  department: string | null;
+  email: string;
+}
 
 const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) => {
   const [balance, setBalance] = useState<number | null>(null);
@@ -107,8 +115,17 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) 
         const { data, error } = await supabase
           .from("pda_balances")
           .select("department, employee_id")
-          .eq("employee_id", normalizedId)
+          
+          .or(
+            [
+              `employee_id.eq.${normalizedId}`,
+              `employee_id.like.%${normalizedId}%`,
+              `employee_id.like.%${normalizedId}`,
+              `employee_id.like.${normalizedId}%`
+            ].join(",")
+          )
           .maybeSingle();
+          
         
         if (data && !error) {
           console.log('[DEBUG] Applicant dept lookup result (pda_balances, exact match)', data);
@@ -117,24 +134,24 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) 
         }
         
         // If exact match fails, try to find by comparing normalized values
-        const res2 = await supabase
-          .from("pda_balances")
-          .select("employee_id, department")
-          .limit(10);
+        // const res2 = await supabase
+        //   .from("pda_balances")
+        //   .select("employee_id, department")
+        //   .limit(10);
         
-        if (res2.data && res2.data.length > 0) {
-          console.log('[DEBUG] Sample pda_balances data:', res2.data);
-          const list = res2.data as Array<{employee_id: string | null, department: string | null}>;
-          const exact = list.find((r) => normalizeEmployeeId(r.employee_id || "") === normalizedId);
-          if (exact?.department) {
-            console.log('[DEBUG] Applicant dept lookup result (pda_balances, normalized match)', exact);
-            setApplicantDepartment(exact.department);
-            return;
-          }
-        }
+        // if (res2.data && res2.data.length > 0) {
+        //   console.log('[DEBUG] Sample pda_balances data:', res2.data);
+        //   const list = res2.data as Array<{employee_id: string | null, department: string | null}>;
+        //   const exact = list.find((r) => normalizeEmployeeId(r.employee_id || "") === normalizedId);
+        //   if (exact?.department) {
+        //     console.log('[DEBUG] Applicant dept lookup result (pda_balances, normalized match)', exact);
+        //     setApplicantDepartment(exact.department);
+        //     return;
+        //   }
+        // }
         
-        console.log('[DEBUG] Applicant dept lookup result (pda_balances) - no match found');
-        setApplicantDepartment(null);
+        // console.log('[DEBUG] Applicant dept lookup result (pda_balances) - no match found');
+        // setApplicantDepartment(null);
       } catch (err) {
         console.error('[DEBUG] Exception during applicant dept lookup (pda_balances)', err);
         setApplicantDepartment(null);
@@ -235,13 +252,31 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) 
     try {
       console.log('[DEBUG] Inserting bill with normalizedData:', normalizedData);
       const { error: insertErr } = await (supabase.from("bills") as any).insert([normalizedData]);
+    
       if (insertErr) {
         alert('[ERROR] Failed to upload bill!: ' + insertErr.message);
         console.error('[DEBUG] Failed to upload bill:', insertErr.message);
         return;
       }
-      alert('Bill submitted successfully!');
+    
+      // ✅ Deduct the bill amount from PDA balance
+      const newBalance = currentBalance - billValue;
+      const { error: updateErr } = await supabase
+        .from<PDABalance>("pda_balances")
+        .update({ balance: newBalance })
+        .eq("employee_id", normalizedEmployeeId);
+    
+      if (updateErr) {
+        alert('[WARNING] Bill saved but PDA balance update failed! Please contact admin.');
+        console.error('[DEBUG] PDA balance update error:', updateErr.message);
+      } else {
+        console.log(`[DEBUG] PDA balance updated successfully. New balance: ₹${newBalance.toFixed(2)}`);
+      }
+    
+      alert('✅ Bill submitted successfully!');
       console.log('[DEBUG] Bill submitted successfully');
+    
+      // Reset form
       setFormData({
         employee_id: "",
         employee_name: "",
@@ -265,6 +300,7 @@ const UploadBill: React.FC<UploadBillProps> = ({ onBillSubmitted, department }) 
       alert('[ERROR] Unexpected error during bill submission! ' + (err.message || err));
       console.error('[DEBUG] Unexpected error:', err.message || err);
     }
+    
   };
 
   return (

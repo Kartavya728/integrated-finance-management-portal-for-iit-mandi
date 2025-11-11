@@ -146,7 +146,7 @@ interface Employee {
 type PageView = "dashboard" | "review-bills" | "hold-bills" | "employees";
 
 export default function FinanceAdminDashboard() {
-  const { data: session } = useSession();
+  const { data: session,status} = useSession();
   const [open, setOpen] = useState(false);
 
   const [bills, setBills] = useState<Bill[]>([]);
@@ -179,7 +179,21 @@ export default function FinanceAdminDashboard() {
   });
 
   //const FINANCE_ADMIN_PASSWORD = "admin123"; // In production, this should be in environment variables
-
+  useEffect(() => {
+      if (status === "loading") return;
+  
+      if (status === "unauthenticated") {
+        if (typeof window !== "undefined") {
+          window.location.href = "/login";
+        }
+        return;
+      }
+  
+      if (session && (session as any).user?.employee_type !== "Finance Admin") {
+        alert("You have no access to this page.");
+        signOut({ callbackUrl: "/login" });
+      }
+    }, [status, session]);
   // fetch bills
   useEffect(() => {
     const fetchBills = async () => {
