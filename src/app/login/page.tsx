@@ -48,8 +48,8 @@ export default function LoginPage() {
           window.location.href = redirectUrl;
         }
       } catch (err) {
-        console.error("Error during login redirection:", err);
-        setError("Error during login. Please try again.");
+        console.error("Error during login redirections:", err);
+        setError("Error during login. Please try again by connecting iit mandi network.");
       }
     }
     setLoading(false);
