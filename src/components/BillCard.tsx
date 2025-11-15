@@ -22,6 +22,89 @@ export const BillCard: React.FC<BillCardProps> = ({
     return `₹${amount.toLocaleString()}`;
   };
 
+
+ const handlePrintBill = () => {
+  const printContent = `
+    <html>
+      <head>
+        <title>Bill ${bill.id}</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+
+          body {
+            font-family: Arial, sans-serif;
+            padding: 0;
+            margin: 0;
+            zoom: 85%;
+          }
+
+          h2 {
+            text-align: center;
+            margin-bottom: 12px;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 12px;
+          }
+
+          td, th {
+            border: 1px solid #555;
+            padding: 6px;
+            text-align: left;
+            vertical-align: top;
+          }
+        </style>
+      </head>
+      <body>
+        <h2>Bill Details</h2>
+        <table>
+          <tr><td>ID</td><td>${bill.id}</td></tr>
+          <tr><td>Employee ID</td><td>${bill.employee_id}</td></tr>
+          <tr><td>Employee Name</td><td>${bill.employee_name}</td></tr>
+          <tr><td>Department</td><td>${bill.employee_department}</td></tr>
+          <tr><td>PO Details</td><td>${bill.po_details}</td></tr>
+          <tr><td>PO Value</td><td>${bill.po_value ? "₹" + bill.po_value : "—"}</td></tr>
+          <tr><td>Supplier Name</td><td>${bill.supplier_name}</td></tr>
+          <tr><td>Supplier Address</td><td>${bill.supplier_address}</td></tr>
+          <tr><td>Item Category</td><td>${bill.item_category}</td></tr>
+          <tr><td>Item Description</td><td>${bill.item_description}</td></tr>
+          <tr><td>Quantity</td><td>${bill.qty}</td></tr>
+          <tr><td>Quantity Issued</td><td>${bill.qty_issued}</td></tr>
+          <tr><td>Indenter Name</td><td>${bill.indenter_name}</td></tr>
+          <tr><td>Bill Details</td><td>${bill.bill_details}</td></tr>
+          <tr><td>Source of Fund</td><td>${bill.source_of_fund}</td></tr>
+          <tr><td>Stock Entry</td><td>${bill.stock_entry}</td></tr>
+          <tr><td>Location</td><td>${bill.location}</td></tr>
+          <tr><td>Remarks</td><td>${bill.remarks}</td></tr>
+          <tr><td>Remarks1</td><td>${bill.remarks1}</td></tr>
+          <tr><td>Remarks2</td><td>${bill.remarks2}</td></tr>
+          <tr><td>Remarks3</td><td>${bill.remarks3}</td></tr>
+          <tr><td>Remarks4</td><td>${bill.remarks4}</td></tr>
+          <tr><td>Status</td><td>${bill.status}</td></tr>
+          <tr><td>SNP</td><td>${bill.snp}</td></tr>
+          <tr><td>Audit</td><td>${bill.audit}</td></tr>
+          <tr><td>Finance Admin</td><td>${bill.finance_admin}</td></tr>
+          <tr><td>Noted</td><td>${bill.noted}</td></tr>
+          <tr><td>Created At</td><td>${new Date(bill.created_at).toLocaleString()}</td></tr>
+        </table>
+      </body>
+    </html>
+  `;
+
+    const printWindow = window.open("", "_blank");
+    printWindow?.document.write(printContent);
+    printWindow?.document.close();
+    printWindow?.focus();
+    printWindow?.print();
+  };
+
+
   return (
     <div className={`bg-white rounded-lg shadow-md p-6 border border-gray-200 ${className}`}>
       {/* Basic Bill Information */}
@@ -178,6 +261,16 @@ export const BillCard: React.FC<BillCardProps> = ({
           </div>
         </div>
       )}
+
+      <div className="mt-6">
+        <button
+          onClick={handlePrintBill}
+          className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700"
+        >
+          Print Bill
+        </button>
+      </div>
+
     </div>
   );
 };

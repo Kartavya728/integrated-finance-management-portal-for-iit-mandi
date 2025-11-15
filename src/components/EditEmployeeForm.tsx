@@ -163,10 +163,9 @@ const EditEmployeeForm: React.FC<EditEmployeeFormProps> = ({
               onChange={handleChange}
               className="mt-1 block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             >
-              <option value="Finance Employee">Finance Employee</option>
-              <option value="faculty">faculty</option>
-              <option value="staff">staff</option>
-              <option value="Student Purchase">Student Purchase</option>
+              <option value="Finance Admin">Finance Admin</option>
+              <option value="Audit">Audit</option>
+              <option value="Student Purchase">Stores and Purchase</option>
               <option value="bill_employee_edit">bill_employee_edit</option>
               <option value="bill_employee_fill">bill_employee_fill</option>
               <option value="pda-manager">pda-manager</option>

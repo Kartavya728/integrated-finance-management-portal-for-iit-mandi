@@ -1,0 +1,20 @@
+services:
+  next-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: my_next_app
+
+    env_file:
+      - .env
+
+    ports:
+      - "3000:3000"
+
+    environment:
+      - NODE_ENV=production
+      # This line can be removed, since it's already in .env:
+      # - NEXTAUTH_SECRET=${AUTH_SECRET}
+
+    restart: unless-stopped

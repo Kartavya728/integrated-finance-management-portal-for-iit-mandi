@@ -7,9 +7,12 @@ import { error } from "console";
 export const runtime = "nodejs";
 
 const ldapConfig = {
-  url: "ldap://users.iitmandi.ac.in:389",
-  baseDN: "dc=iitmandi,dc=ac,dc=in",
-  ou: ["students_ug", "Faculty", "Staff"],
+ 
+  url:process.env.URL,
+
+  baseDN:process.env.BaseDN,
+  
+  ou: process.env.OU ? JSON.parse(process.env.OU) : ["students_ug", "Faculty", "Staff"],
 };
 
 // ---------------- LDAP Authentication ----------------
@@ -91,7 +94,7 @@ export const authOptions: AuthOptions = {
 
         
 
-        if(credentials.username == "Audit" || credentials.username=="User" || credentials.username=="Bill-form" || credentials.username=="Finance Admin" ||credentials.username=="SNP" || credentials.username=="Bill-edit" || credentials.username=="pda manager" || credentials.username=="E002"){
+        if(credentials.username == "Audit" || credentials.username=="User" || credentials.username=="Bill-form" || credentials.username=="Finance Admin" ||credentials.username=="SNP" || credentials.username=="Bill-edit" || credentials.username=="pda manager" || credentials.username=="E001" || credentials.username=="E002" || credentials.username=="E003" || credentials.username=="E004" || credentials.username=="E005" || credentials.username=="E006" || credentials.username=="E007" || credentials.username=="E008"){
           if(credentials.password =="123"){
             const { employee_type, employee_code } = await getEmployeeDetailsByUserId(credentials.username);
             console.log('[NextAuth][authorize] employee details resolved', { employee_type, employee_code });

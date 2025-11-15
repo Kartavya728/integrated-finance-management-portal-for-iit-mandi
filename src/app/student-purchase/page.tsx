@@ -416,7 +416,7 @@ export default function SnpDashboard() {
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">Loading Student Purchase bills...</span>
+            <span className="ml-3 text-gray-600">Loading Stores and Purchase bills...</span>
           </div>
         ) : (
           <>
@@ -426,10 +426,10 @@ export default function SnpDashboard() {
               className="text-center"
             >
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
-                Student Purchase Department
+                Store and Purchase Department
               </h1>
               <p className="text-gray-600 font-medium">
-                Bills under Student Purchase: {pendingCount} pending
+                Bills under Store and Purchase: {pendingCount} pending
               </p>
             </motion.div>
 
@@ -633,7 +633,7 @@ export default function SnpDashboard() {
             <div className="bg-white rounded-lg shadow">
               <div className="p-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-800">
-                  {activeFilter} Bills - Student Purchase
+                  {activeFilter} Bills - Store and Purchase
                 </h2>
               </div>
 
@@ -889,8 +889,8 @@ export default function SnpDashboard() {
                                     {bill.snp === "Approved"
                                       ? "✅ Bill approved"
                                       : bill.snp === "Reject"
-                                      ? "❌ Bill rejected by Student Purchase Department"
-                                      : "⏸️ Bill on Hold by Student Purchase Department"}
+                                      ? "❌ Bill rejected by Store and Purchase Department"
+                                      : "⏸️ Bill on Hold by Store and Purchase Department"}
                                   </p>
                                 </div>
                               )}
@@ -922,7 +922,7 @@ export const Logo = () => (
       animate={{ opacity: 1 }}
       className="whitespace-pre text-black"
     >
-      Student Purchase
+      Store and Purchase
     </motion.span>
   </a>
 );

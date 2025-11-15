@@ -1,0 +1,18 @@
+# D:\New folder (6)\.dockerignore
+
+# Dependencies
+node_modules
+
+# Build output
+.next
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Other
+.git
+.gitignore
+npm-debug.log*
+README.md
